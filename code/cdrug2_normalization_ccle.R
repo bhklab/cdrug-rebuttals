@@ -376,7 +376,7 @@ if(!file.exists(myfn)) {
     iix <- grep("///", dd)
     for(iii in iix) {
       x <- sort(unique(unlist(strsplit(dd[iii], split="///"))))
-      if(length(x) > 1) { s <- x[!is.element(x, "wt")] }
+      if(length(x) > 1) { x <- x[!is.element(x, "wt")] }
       dd[iii] <- paste(x, collapse="///")
     }
     nn <- sampleinfo[match(rownames(dd), sampleinfo[ , "CCLE.name"]), "cellid"]
