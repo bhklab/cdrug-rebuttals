@@ -45,9 +45,6 @@ availcore <- parallel::detectCores()
 if (is.null(nbcore) || nbcore > availcore) { nbcore <- availcore }
 options("mc.cores"=nbcore)
 
-## COSMIC version
-cosmic.version <- "v68"
-
 ## tissue type specific analyses
 tissue.specific <- FALSE
 

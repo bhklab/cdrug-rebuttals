@@ -11,7 +11,24 @@
 ## Pareto distribution
 ## http://stats.stackexchange.com/questions/78168/how-to-know-if-my-data-fits-pareto-distribution
 
+getCosmic <- function(em, passw, directory="tmp") {
 
+  if (missing(em)) { stop ("Email must be provided") }
+  if (missing(passw)) { stop ("Password must be provided") }
+    
+  myagent <- "Firefox/23.0" 
+  mycurl <- RCurl::getCurlHandle()
+  curlSetOpt(cookiejar="cookies.txt", useragent=myagent, followlocation=TRUE, autoreferer=TRUE, curl=mycurl)
+  params <- list("email"=em, "password"=passw)
+  resp <- postForm("https://cancer.sanger.ac.uk/cosmic/login", .params=params, curl=mycurl, style="POST")
+  curlSetOpt(cookiejar="cookies.txt", useragent=myagent, curl=mycurl)
+  resp <-getBinaryURL("http://cancer.sanger.ac.uk/files/cosmic/current_release/CosmicCompleteExport.tsv.gz", curl=mycurl)
+  if (!file.exists(file.path(directory))) { dir.create(file.path(directory), showWarnings=FALSE, recursive=TRUE) }
+  myfl <- file(file.path(directory, "CosmicCompleteExport.tsv.gz"), "wb")
+  writeBin(resp, myfl)
+  close(myfl)
+  return (0)
+}
 
 ## or use gPdtest::gpd.test
 pareto.mle <- function (x) {

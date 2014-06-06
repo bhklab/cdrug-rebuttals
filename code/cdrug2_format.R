@@ -159,8 +159,8 @@ if (!file.exists(myfn)) {
   ## IC50 in micro molar
   message("\tIC50 (CGP)")
 
-  drugn.cgp <- druginfo.cgp[ , "Drug.name"]
-  drugn.cgp[is.na(druginfo.cgp[ , "Drug.name"])] <- gsub("drugid_", "", rownames(druginfo.cgp)[is.na(druginfo.cgp[ , "Drug.name"])])
+  drugn.cgp <- druginfo.cgp[ , "drug.name"]
+  drugn.cgp[is.na(druginfo.cgp[ , "drug.name"])] <- gsub("drugid_", "", rownames(druginfo.cgp)[is.na(druginfo.cgp[ , "drug.name"])])
   ## boxplot
   xx <- -log10(drugpheno.cgp$IC50 / 10^6)
   oo <- order(apply(xx, 2, median, na.rm=TRUE), apply(xx, 2, IQR, na.rm=TRUE), decreasing=FALSE)
@@ -222,7 +222,7 @@ if (!file.exists(myfn)) {
   message("\tIC50 (CCLE)")
 
   drugn.ccle <- druginfo.ccle[ , "Compound..code.or.generic.name."]
-  drugn.ccle[is.na(druginfo.ccle[ , "Compound..code.or.generic.name."])] <- gsub("drugid_", "", rownames(druginfo.cgp)[is.na(druginfo.cgp[ , "Drug.name"])])
+  drugn.ccle[is.na(druginfo.ccle[ , "Compound..code.or.generic.name."])] <- gsub("drugid_", "", rownames(druginfo.cgp)[is.na(druginfo.cgp[ , "drug.name"])])
   ## boxplot
   xx <- -log10(drugpheno.ccle$IC50 / 10^6)
   oo <- order(apply(xx, 2, median, na.rm=TRUE), apply(xx, 2, IQR, na.rm=TRUE), decreasing=FALSE)

@@ -21,6 +21,7 @@ if(!file.exists(path.mut)) { dir.create(path.mut, showWarnings=FALSE, recursive=
 require(gdata) || stop("Library gdata is not available!")
 require(R.utils) || stop("Library R.utils is not available!")
 require(PharmacoGx) || stop("Library PharmacoGx is not available")
+require(XML) || stop("Library XML is not available")
 
 
 ########################
@@ -33,7 +34,7 @@ if(!file.exists(myfn)) {
   
   require(R.utils) || stop("Library R.utils is not available!")
   
-  dir.create(file.path(path.ge, "dwl"), showWarnings=FALSE)
+  dir.create(file.path(path.ge, "dwl"), showWarnings=FALSE, recursive=TRUE)
   
   ## download and compress CEL files
   celfile.timestamp <- celfn <- NULL
@@ -69,6 +70,7 @@ if(!file.exists(myfn)) {
 message("Download sample information")
 myfn <- file.path(path.ge, "cgp_ge_sampleinfo.txt")
 if (!file.exists(myfn)) {
+  dir.create(file.path(path.ge, "dwl"), showWarnings=FALSE, recursive=TRUE)
   dwl.status <- download.file(url=sprintf("%s/E-MTAB-783.sdrf.txt", ftpdir), destfile=file.path(path.ge, "dwl", "E-MTAB-783.sdrf.txt"), quiet=TRUE)
   if(dwl.status != 0) { stop("Download failed, please rerun the pipeline!") }
   file.copy(from=file.path(path.ge, "dwl", "E-MTAB-783.sdrf.txt"), to=myfn)
@@ -78,18 +80,20 @@ if (!file.exists(myfn)) {
 message("Download drug sensitivity measurements")
 myfn <- file.path(path.drug, "cgp_drug_sensitivity.csv")
 if (!file.exists(myfn)) {
-  dwl.status <- download.file(url="ftp://ftp.sanger.ac.uk/pub4/cancerrxgene/releases/release-2.0/gdsc_manova_input_w2.csv", destfile=file.path(path.drug, "dwl", "gdsc_manova_input_w2.csv"), quiet=TRUE)
+  dir.create(file.path(path.drug, "dwl"), showWarnings=FALSE, recursive=TRUE)
+  dwl.status <- download.file(url="ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/release-5.0/gdsc_manova_input_w5.csv", destfile=file.path(path.drug, "dwl", "gdsc_manova_input_w5.csv"), quiet=TRUE)
   if(dwl.status != 0) { stop("Download failed, please rerun the pipeline!") }
-  file.copy(from=file.path(path.drug, "dwl", "gdsc_manova_input_w2.csv"), to=myfn)
+  file.copy(from=file.path(path.drug, "dwl", "gdsc_manova_input_w5.csv"), to=myfn)
 }
 
 ## download drug concentration (release 2)
 message("Download screening drug concentrations")
 myfn <- file.path(path.drug, "cgp_drug_concentration.csv")
 if (!file.exists(myfn)) {
-  dwl.status <- download.file(url="ftp://ftp.sanger.ac.uk/pub4/cancerrxgene/current_release/gdsc_compounds_conc_w2.csv", destfile=file.path(path.drug, "dwl", "gdsc_compounds_conc_w2.csv"), quiet=TRUE)
+  dir.create(file.path(path.drug, "dwl"), showWarnings=FALSE, recursive=TRUE)
+  dwl.status <- download.file(url="ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/release-5.0/gdsc_compounds_conc_w5.csv", destfile=file.path(path.drug, "dwl", "gdsc_compounds_conc_w5.csv"), quiet=TRUE)
   if(dwl.status != 0) { stop("Download failed, please rerun the pipeline!") }
-  file.copy(from=file.path(path.drug, "dwl", "gdsc_compounds_conc_w2.csv"), to=myfn)
+  file.copy(from=file.path(path.drug, "dwl", "gdsc_compounds_conc_w5.csv"), to=myfn)
 }
 
 ## download cell line annotations and COSMIC IDs
@@ -99,10 +103,12 @@ if(!file.exists(myfn)) {
   message("Download COSMIC annotations for cell lines")
   myfn2 <- file.path(path.cell, "cosmic_celline_collection.csv")
   if(!file.exists(myfn2)) {
-    dwl.status <- download.file(url=sprintf("ftp://ftp.sanger.ac.uk//pub/CGP/cell_lines_project/data_export/CosmicCellLineProject_%s.tsv.gz", cosmic.version), destfile=file.path(path.cell, "dwl", sprintf("CosmicCellLineProject_%s.tsv.gz", cosmic.version)), quiet=TRUE)
-    if(dwl.status != 0) { stop("Download failed, please rerun the pipeline! It may be that there is a new version of the file CosmicCellLineProject, please look at ftp://ftp.sanger.ac.uk/pub/CGP/cosmic/data_export/ and update the cosmic version accordingly ...") }
+    dir.create(file.path(path.cell, "dwl"), showWarnings=FALSE, recursive=TRUE)
+    dwl.status <- getCosmic(em="bhk.labgroup@gmail.com", passw="pharmacogenomics", directory=file.path(path.cell, "dwl"))
+    # dwl.status <- download.file(url=sprintf("http://cancer.sanger.ac.uk/files/cosmic/current_release/CosmicCompleteExport.tsv.gz"), destfile=file.path(path.cell, "dwl", sprintf("CosmicCompleteExport.tsv.gz")), quiet=TRUE)
+    if(dwl.status != 0) { stop("Download failed, please rerun the pipeline") }
     ## untar
-    res <- R.utils::gunzip(filename=file.path(path.cell, "dwl", sprintf("CosmicCellLineProject_%s.tsv.gz", cosmic.version)), overwrite=TRUE)
+    res <- R.utils::gunzip(filename=file.path(path.cell, "dwl", sprintf("CosmicCompleteExport.tsv.gz")), overwrite=TRUE)
     file.copy(from=file.path(path.cell, "dwl", sprintf("CosmicCellLineProject_%s.tsv", cosmic.version)), to=myfn2)
   }
   message("Process COSMIC annotations")
@@ -111,7 +117,7 @@ if(!file.exists(myfn)) {
   cosmic.celline <- cosmic.celline[complete.cases(cosmic.celline[ , c("Sample.name", "Sample.source")]) & cosmic.celline[ , "Sample.source"] == "cell-line", , drop=FALSE]
   cosmic.celline[cosmic.celline == "NS" | cosmic.celline == "" | cosmic.celline == " " | cosmic.celline == "  "] <- NA
   ## merge the gene targets
-  dupln <- unique(cosmic.celline[ , "Sample.name"][duplicated(cosmic.celline[ , "Sample.name"])])
+  dupln <- sort(unique(cosmic.celline[ , "Sample.name"][duplicated(cosmic.celline[ , "Sample.name"])]))
   tt <- cosmic.celline
   iix.rm <- NULL
   for(i in 1:length(dupln)) {
@@ -138,9 +144,10 @@ if(!file.exists(myfn)) {
   message("Download GDSC annotations for cell liness")
   myfn2 <- file.path(path.cell, "cgp_celline_collection.csv")
   if(!file.exists(myfn2)) {
-    dwl.status <- download.file(url="ftp://ftp.sanger.ac.uk/pub4/cancerrxgene/current_release/gdsc_cell_lines_w2.csv", destfile=file.path(path.cell, "dwl", "gdsc_cell_lines_w2.csv"), quiet=TRUE)
+    dir.create(file.path(path.cell, "dwl"), showWarnings=FALSE, recursive=TRUE)
+    dwl.status <- download.file(url="ftp://ftp.sanger.ac.uk/pub/project/cancerrxgene/releases/release-5.0/gdsc_cell_lines_w5.csv", destfile=file.path(path.cell, "dwl", "gdsc_cell_lines_w5.csv"), quiet=TRUE)
     if(dwl.status != 0) { stop("Download failed, please rerun the pipeline!") }
-    file.copy(from=file.path(path.cell, "dwl", "gdsc_cell_lines_w2.csv"), to=myfn2)
+    file.copy(from=file.path(path.cell, "dwl", "gdsc_cell_lines_w5.csv"), to=myfn2)
   }
   gdsc.celline <- read.csv(file=file.path(path.cell, "cgp_celline_collection.csv"))
   gdsc.celline[gdsc.celline == "" | gdsc.celline == " " | gdsc.celline == "  "] <- NA
@@ -153,10 +160,6 @@ if(!file.exists(myfn)) {
 
 ## merge GDSC and COSMIC annotations through COSMIC_ID
 message("Merge COSMIC and GDSC annotations for cell liness")
-## comflict between COSMIC and GDSC: NTERA-2_cl_D1 -> NTERA-S-cl-D1
-myx <- which(rownames(cosmic.celline) == "NTERA-2_cl_D1")
-rownames(cosmic.celline)[myx] <- "NTERA-S-cl-D1"
-cosmic.celline[myx, "Sample.name"] <- "NTERA-S-cl-D1"
 iix <- which(complete.cases(gdsc.celline[ , c("CELL_LINE_NAME", "COSMIC_ID")]) & !is.element(gdsc.celline[ , "COSMIC_ID"], cosmic.celline[ , "ID_sample"]) & !is.element(gdsc.celline[ , "CELL_LINE_NAME"], cosmic.celline[ , "Sample.name"]))
 tt <- data.frame(matrix(NA, nrow=nrow(cosmic.celline) + length(iix), ncol=ncol(cosmic.celline), dimnames=list(c(rownames(cosmic.celline), rownames(gdsc.celline)[iix]), colnames(cosmic.celline))))
 tt[rownames(cosmic.celline), ] <- cosmic.celline
@@ -166,15 +169,24 @@ celline.cgp <- tt
 
 ## download drug information
 message("Download drug information")
+myfn <- file.path(path.drug, "cgp_drug_information.csv")
+if (!file.exists(myfn)) {
+  dir.create(file.path(path.drug, "dwl"), showWarnings=FALSE, recursive=TRUE)
+  # dwl.status <- download.file(url="http://www.cancerrxgene.org/action/ExportJsonTable/CSV", destfile=file.path(path.drug, "dwl", "export-Automatically_generated_table_data.csv"), quiet=TRUE)
+  # if(dwl.status != 0) { stop("Download failed, please rerun the pipeline!") }  
+  tables <- XML::readHTMLTable("http://www.cancerrxgene.org/translation/Drug")
+  drugs <- tables[1][[1]]
+  write.csv(drugs, row.names=FALSE, file=file.path(path.drug, "dwl", "export.csv"))
+  file.copy(from=file.path(path.drug, "dwl", "export.csv"), to=myfn)
+}
 myfn <- file.path(path.drug, "nature_supplementary_information.xls")
 if (!file.exists(myfn)) {
+  dir.create(file.path(path.drug, "dwl"), showWarnings=FALSE, recursive=TRUE)
   dwl.status <- download.file(url="http://www.nature.com/nature/journal/v483/n7391/extref/nature11005-s2.zip", destfile=file.path(path.drug, "dwl", "nature11005-s2.zip"), quiet=TRUE)
-  if(dwl.status != 0) { stop("Download failed, please rerun the pipeline!") }
   ff <- as.character(unzip(zipfile=file.path(path.drug, "dwl", "nature11005-s2.zip"), list=TRUE)[1, 1])
   unzip(zipfile=file.path(path.drug, "dwl", "nature11005-s2.zip"), exdir=file.path(path.drug, "dwl"))
   file.copy(from=file.path(path.drug, "dwl", ff), to=myfn)
 }
-
 ########################
 ## normalize and format data
 ########################
@@ -228,7 +240,7 @@ if(!file.exists(myfn)) {
   ## format column names
   coln2 <- unlist(drugpheno[1, ,drop=TRUE])
   coln2[coln2 == ""] <- NA
-  drugpheno <- drugpheno[-1, ,drop=FALSE]
+  drugpheno <- drugpheno[!is.na(drugpheno[ , "Cell.Line"]), ,drop=FALSE]
   coln <- colnames(drugpheno)
   coln2[is.na(coln2)] <- coln[is.na(coln2)]
   coln2 <- genefu::rename.duplicate(x=coln2, sep="_dupl")$new.x
@@ -248,6 +260,7 @@ if(!file.exists(myfn)) {
   dupln <- duplicated(drugpheno[ ,"Cell.Line"])
   if(sum(dupln) > 1) { warning("some cell lines are duplicated, only the first instance is kept") }
   drugpheno <- drugpheno[!dupln, , drop=FALSE]
+  
   if(any(!is.element(drugpheno[ ,"Cell.Line"], celline.cgp[ , "Sample.name"]))) { stop("Some cell line names are not included in the COSMIC database") }
   celln <- drugpheno[ ,"Cell.Line"]
   drugpheno <- data.frame("cellid"=celln, drugpheno)
@@ -256,12 +269,12 @@ if(!file.exists(myfn)) {
   ## protein coding variants
   ## Genetic mutation data for cancer genes. Includes MSI status (1 = unstable and 0 = stable) and gene-fusions. A binary code 'x::y' description is used for each gene where 'x' identifies a coding variant and 'y' indicates copy number information from SNP6.0 data. For gene fusions, cell lines are identified as fusion not-detected (0) or the identified fusion is given. The following abbreviations are used: not analysed (na), not detected or wild-type (wt), no copy number information (nci).
   ## we assume that AKT2 and WT1 are the first and last genes in the file
-  rangeg <- which(colnames(drugpheno) == "AKT2"):which(colnames(drugpheno) == "WT1")
+  rangeg <- which(colnames(drugpheno) == "AKT2"):which(colnames(drugpheno) == "MLL_AFF1")
   mutation <- as.matrix(drugpheno[ , rangeg, drop=FALSE])
   mutation <- apply(X=mutation, MARGIN=c(1, 2), FUN=function(x) {
     x <- unlist(strsplit(x, split="::"))
     if(length(x) == 2) {
-      if(!is.na(x[[1]]) && (x[[1]] == "na" || x[[1]] == "p.?" || x[[1]] == "p.0?")) {
+      if(!is.na(x[[1]]) && (x[[1]] == "na")) {
         x <- NA
       } else {
         x <- x[[1]]
@@ -362,22 +375,34 @@ if(!file.exists(myfn)) {
 
   ## drug information
   message("Read drug information")
-  myfn2 <- file.path(saveres, "nature_supplinfo_druginfo_cgp.RData")
-  if(!file.exists(myfn2)) {
-    druginfo <- gdata::read.xls(xls=file.path(path.drug, "nature_supplementary_information.xls"), sheet=4)
-    druginfo[druginfo == "" | druginfo == " "] <- NA
-    save(list="druginfo", compress=TRUE, file=myfn2)
-  } else { load(myfn2) }
-  druginfo <- data.frame("drugid"=gsub(pattern =badchars, replacement="", x=toupper(druginfo[ ,"Drug.ID"])), druginfo)
-  rownames(druginfo) <- paste("drugid", as.character(druginfo[ ,"drugid"]), sep="_")
+  # myfn2 <- file.path(saveres, "nature_supplinfo_druginfo_cgp.RData")
+  # if(!file.exists(myfn2)) {
+    # druginfo <- gdata::read.xls(xls=file.path(path.drug, "nature_supplementary_information.xls"), sheet=4)
+    # druginfo[druginfo == "" | druginfo == " "] <- NA
+    # save(list="druginfo", compress=TRUE, file=myfn2)
+  # } else { load(myfn2) }
+  druginfo <- read.csv(file.path(path.drug, "cgp_drug_information.csv"))
+  druginfo[!is.na(druginfo) & (druginfo == " " | druginfo == " ")] <- NA
+  druginfo <- data.frame("drug.name"=toupper(gsub(badchars, "", druginfo[ ,"Name"])), druginfo)
+  myx <- match(druginfo[ , "drug.name"], drugnid[ , "drug.name"])
+  if (any(is.na(myx))) { stop ("Some drugs have missing annotations") }
+  ## correct ambiguity for AZD6482: drugid_156 corresponds to the first occurence of AZD6482 while drugid_1066 corresponds to the second
+  ## table(!is.na(drugpheno[ , "drugid_156_AUC"]))
+  ## table(!is.na(drugpheno[ , "drugid_1066_AUC"]))
+  myx[druginfo[ , "drug.name"] == "AZD6482"][2] <- which(drugnid[ , "drug.name"] == "AZD6482")[2]
+  druginfo <- data.frame("drugid"=rownames(drugnid)[myx], drugnid[myx, , drop=FALSE], druginfo)
+  rownames(druginfo) <- as.character(druginfo[ ,"drugid"])
 
   ## drug concentration
   message("Read drug concentration")
   drugconc <- read.csv(file.path(path.drug, "cgp_drug_concentration.csv"))
-  drugconc[drugconc == "" | drugconc == " "] <- NA
+  drugconc[!is.na(drugconc) & (drugconc == "" | drugconc == " ")] <- NA
   drugconc <- data.frame("drug.name"=toupper(gsub(badchars, "", drugconc[ ,"Compound.Name"])), drugconc)
-  if(all(!is.element(drugconc[ , "drug.name"], drugnid[ , "drug.name"]))) { stop("Screening concentration for drugs ithout identifiers!") }
-  rownames(drugconc) <- rownames(drugnid)[match(drugconc[ , "drug.name"], drugnid[ , "drug.name"])]
+  if(all(!is.element(drugconc[ , "drug.name"], drugnid[ , "drug.name"]))) { stop("Screening concentration for drugs without identifiers!") }
+  myx <- match(drugconc[ , "drug.name"], drugnid[ , "drug.name"])
+  ## correct ambiguity for AZD6482: drugid_156 corresponds to the first occurence of AZD6482 while drugid_1066 corresponds to the second
+  myx[drugconc[ , "drug.name"] == "AZD6482"][2] <- which(drugnid[ , "drug.name"] == "AZD6482")[2]
+  rownames(drugconc) <- rownames(drugnid)[myx]
   drugconc <- data.frame("drugid"=rownames(drugconc), drugconc)
 
   ## combine all drugs
@@ -427,7 +452,7 @@ if(!file.exists(myfn)) {
         tt <- celfn[x]
         names(tt) <- NULL
         abatch <- affy::read.affybatch(filenames=tt)
-        rr <- frma::frma(object=abatch, summarize="robust_weighted_average", verbose=TRUE, input.vecs=hgu133plus2frmavecs)
+        rr <- frma::frma(object=abatch, summarize="robust_weighted_average", verbose=TRUE, input.vecs=hthgu133afrmavecs)
         return(exprs(rr))
       }, celfn=celfnt)
       genexprs <- rbind(genexprs, t(do.call(cbind, res)))
