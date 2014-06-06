@@ -375,12 +375,6 @@ if(!file.exists(myfn)) {
 
   ## drug information
   message("Read drug information")
-  # myfn2 <- file.path(saveres, "nature_supplinfo_druginfo_cgp.RData")
-  # if(!file.exists(myfn2)) {
-    # druginfo <- gdata::read.xls(xls=file.path(path.drug, "nature_supplementary_information.xls"), sheet=4)
-    # druginfo[druginfo == "" | druginfo == " "] <- NA
-    # save(list="druginfo", compress=TRUE, file=myfn2)
-  # } else { load(myfn2) }
   druginfo <- read.csv(file.path(path.drug, "cgp_drug_information.csv"))
   druginfo[!is.na(druginfo) & (druginfo == " " | druginfo == " ")] <- NA
   druginfo <- data.frame("drug.name"=toupper(gsub(badchars, "", druginfo[ ,"Name"])), druginfo)
@@ -392,6 +386,15 @@ if(!file.exists(myfn)) {
   myx[druginfo[ , "drug.name"] == "AZD6482"][2] <- which(drugnid[ , "drug.name"] == "AZD6482")[2]
   druginfo <- data.frame("drugid"=rownames(drugnid)[myx], drugnid[myx, , drop=FALSE], druginfo)
   rownames(druginfo) <- as.character(druginfo[ ,"drugid"])
+  ## complement drug infomration with the supplementary infomration from the Nature website
+  myfn2 <- file.path(saveres, "nature_supplinfo_druginfo_cgp.RData")
+  if(!file.exists(myfn2)) {
+    druginfo.nature <- gdata::read.xls(xls=file.path(path.drug, "nature_supplementary_information.xls"), sheet=4)
+    druginfo.nature[druginfo.nature == "" | druginfo.nature == " "] <- NA
+    save(list="druginfo.nature", compress=TRUE, file=myfn2)
+  } else { load(myfn2) }
+  rownames(druginfo.nature) <- paste("drugid", druginfo.nature[ , "Drug.ID"], sep="_")
+  druginfo <- data.frame(druginfo, druginfo.nature[rownames(druginfo), c("Brand.name", "Site.of.screening", "Drug.type", "Drug.class.I", "Drug.class.II", "Target.family", "Effector.pathway.biological.process", "Clinical.trials", "Source")])
 
   ## drug concentration
   message("Read drug concentration")

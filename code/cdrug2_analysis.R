@@ -1181,8 +1181,8 @@ if (!file.exists(myfn)) {
   auc.call3.cgp <- data.frame(matrix(NA, ncol=ncol(drugpheno.cgp$AUC), nrow=nrow(drugpheno.cgp$AUC), dimnames=dimnames(drugpheno.cgp$AUC)))
   ## AUC sensitivity calling 3 levels
   pdf(file.path(saveres, "cgp_auc_sensitivity_calling3_drugs_tuned.pdf"), width=10, height=10)
-  drugn.cgp <- druginfo.cgp[ , "Drug.name"]
-  drugn.cgp[is.na(druginfo.cgp[ , "Drug.name"])] <- rownames(druginfo.cgp)[is.na(druginfo.cgp[ , "Drug.name"])]
+  drugn.cgp <- druginfo.cgp[ , "drug.name"]
+  drugn.cgp[is.na(druginfo.cgp[ , "drug.name"])] <- rownames(druginfo.cgp)[is.na(druginfo.cgp[ , "drug.name"])]
   for(i in 1:ncol(drugpheno.cgp$AUC)) {
     auc.call3.cgp [ , i] <- callingWaterfallAUC(x=drugpheno.cgp$AUC[ , i], drug.class="Unspecified", drug.ks=gpd.cutoff, intermediate.fold=c("Targeted"=4, "Cytotoxic"=1.2), name=sprintf("%s (CGP)", drugn.cgp[i]), plot=TRUE)
   }

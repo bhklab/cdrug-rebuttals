@@ -12,10 +12,8 @@
 ## http://stats.stackexchange.com/questions/78168/how-to-know-if-my-data-fits-pareto-distribution
 
 getCosmic <- function(em, passw, directory="tmp") {
-
   if (missing(em)) { stop ("Email must be provided") }
-  if (missing(passw)) { stop ("Password must be provided") }
-    
+  if (missing(passw)) { stop ("Password must be provided") } 
   myagent <- "Firefox/23.0" 
   mycurl <- RCurl::getCurlHandle()
   curlSetOpt(cookiejar="cookies.txt", useragent=myagent, followlocation=TRUE, autoreferer=TRUE, curl=mycurl)
