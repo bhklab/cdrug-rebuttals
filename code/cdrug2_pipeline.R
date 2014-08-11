@@ -77,7 +77,7 @@ quantile.cuts <- c(1, 0.5, 0.2, 0.05, 0.01)
 source(file.path("code", "cdrug2_foo.R"))
 
 if(!file.exists("cdrug2_log.txt")) {
-  steps <- c("cdrug2_normalization_cgp", "cdrug2_normalization_ccle", "cdrug2_format", "cdrug2_analysis")
+  steps <- c("cdrug2_normalization_cgp", "cdrug2_normalization_ccle", "cdrug2_normalization_gsk", "cdrug2_format", "cdrug2_analysis")
   progress.log <- cbind(steps, rep("...", length(steps)))
   dimnames(progress.log) <- list(paste("step", 1:length(steps), sep="."), c("script", "progress"))
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
@@ -98,7 +98,7 @@ if (progress.log["step.1", "progress"] != "done") {
 }
 message("\t-> DONE")
 
-# #######################
+#######################
 ## curation, annotation and normalization of CCLE data
 
 message("\n------------------------------\n| Normalization of CCLE data |\n------------------------------")
@@ -111,12 +111,25 @@ if (progress.log["step.2", "progress"] != "done") {
 }
 message("\t-> DONE")
 
-message("\n-------------------------------------\n| Intersection between GGP and CCLE |\n-------------------------------------")
+#######################
+## curation, annotation and normalization of GSK data
+
+message("\n------------------------------\n| Normalization of GSK data |\n------------------------------")
 if (progress.log["step.3", "progress"] != "done") {
   progress.log["step.3", "progress"] <- "in progress"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
-  source(file.path("code", "cdrug2_format.R"))
+  source(file.path("code", "cdrug2_normalization_gsk.R"))
   progress.log["step.3", "progress"] <- "done"
+  write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
+}
+message("\t-> DONE")
+
+message("\n-------------------------------------\n| Intersection between GGP and CCLE |\n-------------------------------------")
+if (progress.log["step.4", "progress"] != "done") {
+  progress.log["step.4", "progress"] <- "in progress"
+  write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
+  source(file.path("code", "cdrug2_format.R"))
+  progress.log["step.4", "progress"] <- "done"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
 }
 message("\t-> DONE")
@@ -125,11 +138,11 @@ message("\t-> DONE")
 ## script performing the correlation analyses at the level of gene expressions
 
 message("\n-------------------------------------------------------------------\n| Additional analysis regarding consistency between GGP and CCLE |\n-------------------------------------------------------------------")
-if (progress.log["step.4", "progress"] != "done") {
-  progress.log["step.4", "progress"] <- "in progress"
+if (progress.log["step.5", "progress"] != "done") {
+  progress.log["step.5", "progress"] <- "in progress"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
   source(file.path("code", "cdrug2_analysis.R"))
-  progress.log["step.4", "progress"] <- "done"
+  progress.log["step.5", "progress"] <- "done"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
 }
 message("\t-> DONE")

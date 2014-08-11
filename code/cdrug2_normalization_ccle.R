@@ -555,7 +555,29 @@ if(!file.exists(myfn)) {
   })
   colnames(ndoses) <- gsub("_Doses", "", colnames(ndoses))
   ndoses <- ndoses[rownames(auct), colnames(auct)]
-  auct <- auct / ndoses
+  
+  ## compute AUC
+  iix <- grep("_ActivityData$", colnames(drugpheno))
+  names(iix) <- gsub("_ActivityData$", "", colnames(drugpheno)[iix])
+  iix2 <- grep("_Doses$", colnames(drugpheno))
+  names(iix2) <- gsub("_Doses$", "", colnames(drugpheno)[iix2])
+  myx <- intersect(names(iix), names(iix2))
+  iix <- iix[myx]
+  iix2 <- iix2[myx]
+  xx <- array(NA, dim=c(nrow(drugpheno), length(iix), 2), dimnames=list(rownames(drugpheno), names(iix), c("ActArea", "Doses")))
+  xx[ , , "ActArea"] <- apply(drugpheno[ , iix, drop=FALSE], 2, as.character)
+  xx[ , , "Doses"] <- apply(drugpheno[ , iix2, drop=FALSE], 2, as.character)
+  auct <- apply(X=xx, MARGIN=c(1,2), FUN=function(x) {
+    aa <- - as.numeric(unlist(strsplit(x[1], ","))) / 100
+    dd <- as.numeric(unlist(strsplit(x[2], ","))) / 100
+    ## average
+    xx <- sum(aa) / sum(!is.na(aa))
+    ## compute AUC using trapezoidal estimation
+    # xx <- MESS::auc(x=1:length(aa), y=aa, type="linear") / 8
+    ## compute AUC using Simpson's rule
+    # xx <- MESS::auc(x=dd, y=aa, type="spline")
+    return(xx)
+  })
   dd <- matrix(NA, ncol=length(drugnall), nrow=length(cellnall), dimnames=list(cellnall, drugnall))
   dd[rownames(auct), colnames(auct)] <- data.matrix(auct)
   dd[dd < 0] <- 0

@@ -67,48 +67,93 @@ if (!file.exists(myfn)) {
   if(any(!is.element(rownames(data.ge.ccle), rownames(celline.ccle)))) { stop("some cell lines in CCLE are not part of CCLE cell line collection") }
 
   ## read manual matching for cell lines in CCLE and CGP
-  match.ccle.cgp <- read.csv(file=file.path("code", "matching_cell_line_CCLE_CGP.csv"))
+  match.cellines <- read.csv(file=file.path("code", "cell_line_annotation_all.csv"))
 
-  ## use CGP cell lines as reference 
+  ## CCLE
   ## update ccle cell line collection
-  nn <- intersect(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), as.character(celline.ccle[ , "cellid"]))
-  iix0 <- which(is.element(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), nn))
-  iix <- match(as.character(match.ccle.cgp[iix0, "CCLE.cell.line"]), as.character(celline.ccle[ , "cellid"]))
-  celline.ccle[iix, "cellid"] <- as.character(match.ccle.cgp[iix0, "CGP.cell.line"])
+  nn <- intersect(as.character(match.cellines[ , "CCLE.cellid"]), as.character(celline.ccle[ , "cellid"]))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CCLE.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CCLE.cellid"]), as.character(celline.ccle[ , "cellid"]))
+  celline.ccle[iix, "cellid"] <- as.character(match.cellines[iix0, "unique.cellid"])
+  celline.ccle <- data.frame(celline.ccle, "tissueid"=celline.ccle[ , "Site.Primary"])
+  celline.ccle[iix, "tissueid"] <- as.character(match.cellines[iix0, "unique.tissueid"])
   rownames(celline.ccle) <- as.character(celline.ccle[ , "cellid"])
   ## update ccle gene expression
-  nn <- intersect(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), rownames(data.ge.ccle))
-  iix0 <- which(is.element(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), nn))
-  iix <- match(as.character(match.ccle.cgp[iix0, "CCLE.cell.line"]), rownames(data.ge.ccle))
-  rownames(data.ge.ccle)[iix] <- as.character(match.ccle.cgp[iix0, "CGP.cell.line"])
+  nn <- intersect(as.character(match.cellines[ , "CCLE.cellid"]), rownames(data.ge.ccle))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CCLE.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CCLE.cellid"]), rownames(data.ge.ccle))
+  rownames(data.ge.ccle)[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
   ## update ccle sample information
-  nn <- intersect(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), rownames(sampleinfo.ccle))
-  iix0 <- which(is.element(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), nn))
-  iix <- match(as.character(match.ccle.cgp[iix0, "CCLE.cell.line"]), rownames(sampleinfo.ccle))
-  rownames(sampleinfo.ccle)[iix] <- as.character(match.ccle.cgp[iix0, "CGP.cell.line"])
+  nn <- intersect(as.character(match.cellines[ , "CCLE.cellid"]), rownames(sampleinfo.ccle))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CCLE.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CCLE.cellid"]), rownames(sampleinfo.ccle))
+  rownames(sampleinfo.ccle)[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
   sampleinfo.ccle[ , "cellid"] <- rownames(sampleinfo.ccle)
   ## update ccle drug phenotypes
   for (i in 1:length(drugpheno.ccle)) {
-    nn <- intersect(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), rownames(drugpheno.ccle[[i]]))
-    iix0 <- which(is.element(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), nn))
-    iix <- match(as.character(match.ccle.cgp[iix0, "CCLE.cell.line"]), rownames(drugpheno.ccle[[i]]))
-    rownames(drugpheno.ccle[[i]])[iix] <- as.character(match.ccle.cgp[iix0, "CGP.cell.line"])
+    nn <- intersect(as.character(match.cellines[ , "CCLE.cellid"]), rownames(drugpheno.ccle[[i]]))
+    iix0 <- which(is.element(as.character(match.cellines[ , "CCLE.cellid"]), nn))
+    iix <- match(as.character(match.cellines[iix0, "CCLE.cellid"]), rownames(drugpheno.ccle[[i]]))
+    rownames(drugpheno.ccle[[i]])[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
   }
   ## update ccle drug concentrations
-  nn <- intersect(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), drugconc.ccle[ , "cellid"])
-  iix0 <- which(is.element(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), nn))
+  nn <- intersect(as.character(match.cellines[ , "CCLE.cellid"]), drugconc.ccle[ , "cellid"])
+  iix0 <- which(is.element(as.character(match.cellines[ , "CCLE.cellid"]), nn))
   for(i in 1:length(iix0)) {
-    myx <- !is.na(drugconc.ccle[ , "cellid"]) & drugconc.ccle[ , "cellid"] == match.ccle.cgp[iix0[i], "CCLE.cell.line"]
-    drugconc.ccle[myx, "cellid"] <- as.character(match.ccle.cgp[iix0[i], "CGP.cell.line"])
+    myx <- !is.na(drugconc.ccle[ , "cellid"]) & drugconc.ccle[ , "cellid"] == match.cellines[iix0[i], "CCLE.cellid"]
+    drugconc.ccle[myx, "cellid"] <- as.character(match.cellines[iix0[i], "unique.cellid"])
   }
   rownames(drugconc.ccle) <- paste(as.character(drugconc.ccle[ , "drugid"]), as.character(drugconc.ccle[ , "cellid"]), sep="...")
   ## update ccle mutations
-  nn <- intersect(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), rownames(mutation.ccle))
-  iix0 <- which(is.element(as.character(match.ccle.cgp[ , "CCLE.cell.line"]), nn))
-  iix <- match(as.character(match.ccle.cgp[iix0, "CCLE.cell.line"]), rownames(mutation.ccle))
-  rownames(mutation.ccle)[iix] <- as.character(match.ccle.cgp[iix0, "CGP.cell.line"])
-
-  ## intersection between GSK, CGP and CCLE
+  nn <- intersect(as.character(match.cellines[ , "CCLE.cellid"]), rownames(mutation.ccle))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CCLE.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CCLE.cellid"]), rownames(mutation.ccle))
+  rownames(mutation.ccle)[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
+  
+  ## CGP
+  ## update cgp cell line collection
+  nn <- intersect(as.character(match.cellines[ , "CGP.cellid"]), as.character(celline.cgp[ , "cellid"]))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CGP.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CGP.cellid"]), as.character(celline.cgp[ , "cellid"]))
+  celline.cgp[iix, "cellid"] <- as.character(match.cellines[iix0, "unique.cellid"])
+  celline.cgp <- data.frame(celline.cgp, "tissueid"=celline.cgp[ , "Primary.site"])
+  celline.cgp[iix, "tissueid"] <- as.character(match.cellines[iix0, "unique.tissueid"])
+  ## remove possible duplicates
+  celline.cgp <- celline.cgp[!duplicated(as.character(celline.cgp[ , "cellid"])), , drop=FALSE]
+  rownames(celline.cgp) <- as.character(celline.cgp[ , "cellid"])
+  ## update cgp gene expression
+  nn <- intersect(as.character(match.cellines[ , "CGP.cellid"]), rownames(data.ge.cgp))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CGP.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CGP.cellid"]), rownames(data.ge.cgp))
+  rownames(data.ge.cgp)[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
+  ## update cgp sample information
+  nn <- intersect(as.character(match.cellines[ , "CGP.cellid"]), rownames(sampleinfo.cgp))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CGP.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CGP.cellid"]), rownames(sampleinfo.cgp))
+  rownames(sampleinfo.cgp)[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
+  sampleinfo.cgp[ , "cellid"] <- rownames(sampleinfo.cgp)
+  ## update cgp drug phenotypes
+  for (i in 1:length(drugpheno.cgp)) {
+    nn <- intersect(as.character(match.cellines[ , "CGP.cellid"]), rownames(drugpheno.cgp[[i]]))
+    iix0 <- which(is.element(as.character(match.cellines[ , "CGP.cellid"]), nn))
+    iix <- match(as.character(match.cellines[iix0, "CGP.cellid"]), rownames(drugpheno.cgp[[i]]))
+    rownames(drugpheno.cgp[[i]])[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
+  }
+  ## update cgp drug concentrations
+  nn <- intersect(as.character(match.cellines[ , "CGP.cellid"]), drugconc.cgp[ , "cellid"])
+  iix0 <- which(is.element(as.character(match.cellines[ , "CGP.cellid"]), nn))
+  for(i in 1:length(iix0)) {
+    myx <- !is.na(drugconc.cgp[ , "cellid"]) & drugconc.cgp[ , "cellid"] == match.cellines[iix0[i], "CGP.cellid"]
+    drugconc.cgp[myx, "cellid"] <- as.character(match.cellines[iix0[i], "unique.cellid"])
+  }
+  rownames(drugconc.cgp) <- paste(as.character(drugconc.cgp[ , "drugid"]), as.character(drugconc.cgp[ , "cellid"]), sep="...")
+  ## update cgp mutations
+  nn <- intersect(as.character(match.cellines[ , "CGP.cellid"]), rownames(mutation.cgp))
+  iix0 <- which(is.element(as.character(match.cellines[ , "CGP.cellid"]), nn))
+  iix <- match(as.character(match.cellines[iix0, "CGP.cellid"]), rownames(mutation.cgp))
+  rownames(mutation.cgp)[iix] <- as.character(match.cellines[iix0, "unique.cellid"])
+  
+  ## intersection between CGP and CCLE
   ll <- list("CGP"=rownames(sampleinfo.cgp), "CCLE"=rownames(sampleinfo.ccle))
   rr <- sapply(overlap(ll), length)
   pdf(file.path(file.path(saveres, "intersection_cellines_cgp_ccle_paper.pdf")), width=5, height=5)
@@ -120,28 +165,13 @@ if (!file.exists(myfn)) {
   celln <- sort(unique(c(rownames(sampleinfo.ccle), rownames(sampleinfo.cgp))))
   celline.collection <- data.frame(matrix(NA, nrow=length(celln), ncol=7, dimnames=list(celln, c("cellid", "CGP.cell.line", "CCLE.cell.line", "CGP.tissue.type", "CCLE.tissue.type", "CGP.link", "CCLE.link"))))
   celline.collection[ , "cellid"] <- celln
-  celline.collection[rownames(data.ge.cgp), c("CGP.cell.line", "CGP.tissue.type", "CGP.link")] <- celline.cgp[rownames(data.ge.cgp), c("Sample.name", "Primary.site", "link")]
-  celline.collection[rownames(data.ge.ccle), c("CCLE.cell.line", "CCLE.tissue.type", "CCLE.link")] <- celline.ccle[rownames(data.ge.ccle), c("Cell.line.primary.name", "Site.Primary", "link")]
-
-  ## merge tissue types
-  iix <- apply(celline.collection[ , c("CGP.tissue.type", "CCLE.tissue.type")], 1, function(x) {
-    if(all(!is.na(x)) & (x[1] != x[2])) { 
-      return(TRUE) 
-    } else {
-      return(FALSE)
-    }
-  })
-  ## in case of discrepancies, use CGP as reference
-  tt <- celline.collection[ , "CGP.tissue.type"]
-  names(tt) <- rownames(celline.collection)
-  ## read manual curation of tissue types for cell lines with missing tissue type in CGP and CCLE
-  match.tissue.ccle.cgp <- read.csv(file=file.path("code", "matching_tissue_type_CCLE_CGP.csv"))
-  tt[as.character(match.tissue.ccle.cgp[ , "cellid"])] <- as.character(match.tissue.ccle.cgp[ , "new.tissue.type"])
-  ## use CCLE tissue type for missing entries
-  tt[is.na(tt)] <- celline.collection[is.na(tt), "CCLE.tissue.type"]
-  tissue.cgp <- tt[rownames(data.ge.cgp)]
-  tissue.ccle <- tt[rownames(data.ge.ccle)]
+  celline.collection[rownames(data.ge.cgp), c("CGP.cell.line", "CGP.tissue.type", "CGP.link")] <- celline.cgp[rownames(data.ge.cgp), c("Sample.name", "tissueid", "link")]
+  celline.collection[rownames(data.ge.ccle), c("CCLE.cell.line", "CCLE.tissue.type", "CCLE.link")] <- celline.ccle[rownames(data.ge.ccle), c("Cell.line.primary.name", "tissueid", "link")]
+  tissue.cgp <- celline.cgp[rownames(sampleinfo.cgp), "tissueid"]
+  tissue.ccle <- celline.ccle[rownames(sampleinfo.ccle), "tissueid"]
   ## save cell line collection
+  tt <- celline.collection[ , "CGP.tissue.type"]
+  tt[is.na(tt)] <- celline.collection[is.na(tt), "CCLE.tissue.type"]
   celline.collection <- data.frame(celline.collection, "tissue.type"=tt)
   write.csv(celline.collection, file=file.path(saveres, "cell_line_collection_all.csv"), row.names=FALSE)
   ## update sample information with tissue types
