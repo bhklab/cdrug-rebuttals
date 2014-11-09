@@ -364,6 +364,7 @@ if(!file.exists(myfn)) {
   myx <- sapply(sapply(strsplit(coln2, "_"), function(x) { return(x[[1]]) }), Hmisc::all.is.numeric)
   coln2[myx] <- paste("drugid", gsub(pattern=badchars, replacement="_", x=toupper(coln2[myx])), sep="_")
   colnames(drugpheno.nature) <- coln2
+  rownames(drugpheno.nature) <- as.character(drugpheno.nature[ , "Cell.Line"])
   myx <- sapply(strsplit(colnames(drugpheno.nature), "_"), function(x) { return(all(x[c(length(x)-1, length(x))] == c("IC", "50"))) })
   ic50 <- drugpheno.nature[ , myx, drop=FALSE]
   nn <- dimnames(ic50)
