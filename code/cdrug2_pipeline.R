@@ -23,6 +23,7 @@ require(parallel) || stop("Library parallel is not available")
 require(MetaGx) || stop("Library MetaGx is not available")
 require(PharmacoGx) || stop("Library PharmacoGx is not available")
 require(genefu) || stop("Library genefu is not available")
+require(gdata) || stop("Library gdata is not available")
 
 ########################
 ## global parameters
@@ -40,7 +41,7 @@ set.seed(54321)
 
 ## number of cpu cores available for the analysis pipeline
 ## set to 'NULL' if all the available cores should be used
-nbcore <- 30
+nbcore <- 16
 availcore <- parallel::detectCores()
 if (is.null(nbcore) || nbcore > availcore) { nbcore <- availcore }
 options("mc.cores"=nbcore)
@@ -61,6 +62,9 @@ max.celfiles <- 300
 ## minimum number of samples to compute correlation
 minsample <- 10
 
+## minimum number of samples in each category for the adaptive MCC computation
+min.cat <- 3
+
 ## max fdr, threshold used to identify genes with significant concordance index
 myfdr <- 0.20
 
@@ -72,6 +76,22 @@ genedrugm <- "lm"
 concordance.method <- "spearman"
 fdr.cuts <- c(1, 0.5, 0.2, 0.05, 0.01)
 quantile.cuts <- c(1, 0.5, 0.2, 0.05, 0.01)
+
+## Broad landmark genes
+dir.create(file.path("data", "L1000", "dwl"), recursive=TRUE, showWarnings=FALSE)
+myfn <- file.path("saveres", "l1000_genes.RData")
+if (!file.exists(myfn)) {
+  message("Download landmark genes from L1000")
+  dwl.status <- download.file(url="http://www.lincscloud.org/l1000/example_files/Landmark_Genes_n978.xlsx", destfile=file.path("data", "L1000", "dwl", "Landmark_Genes_n978.xlsx"), quiet=TRUE)
+  if(dwl.status != 0) { stop("Download failed, please rerun the pipeline!") }
+  file.copy(from=file.path("data", "L1000", "dwl", "Landmark_Genes_n978.xlsx"), to=file.path("data", "L1000", "l1000_genes.xlsx"))
+  ## read xls into data frame
+  l1000.genes <- gdata::read.xls(xls=file.path("data", "L1000", "l1000_genes.xlsx"), sheet=1)
+  l1000.genes <- l1000.genes[!is.na(l1000.genes[ , "Entrez.Gene.ID"]) & !duplicated(l1000.genes[ , "Entrez.Gene.ID"]), , drop=FALSE]
+  rownames(l1000.genes) <- paste("geneid", as.character(l1000.genes[ , "Entrez.Gene.ID"]), sep="_")
+  save(list=c("l1000.genes"), compress=TRUE, file=myfn)
+}
+
 
 ## additional functions
 source(file.path("code", "cdrug2_foo.R"))

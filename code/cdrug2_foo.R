@@ -29,6 +29,82 @@ getCosmic <- function(em, passw, directory="tmp") {
   return (0)
 }
 
+## function to compute the Matthews Correlation Coefficient (MCC) in a classification framework
+## ct: confusion table (matrix or table)
+## nbcat: the actual number of categories for the truth and the predictions
+## Example:
+## rr <- sapply(1:1000, function(x, cc) { set.seed(x); ctt <- table(sample(1:cc, 100, replace=TRUE), sample(1:cc, 100, replace=TRUE)); return(mcc(ct=ctt, nbcat=cc)); }, cc=3)
+## hist(rr)
+`.mcc` <- 
+function(ct, nbcat=nrow(ct)) {
+	if(nrow(ct) != ncol(ct)) { stop("the confusion table should be square!") }
+	if(!(sum(ct)==sum(diag(ct))) &&  (length(which(apply(ct, 1, sum) == 0)) == (nbcat-1) & ((length(which(apply(ct, 2, sum) == 0)) != (nbcat-1)) | (length(which(apply(ct, 2, sum) == 0)) == (nbcat-1)))) || (length(which(apply(ct, 2, sum) == 0)) == (nbcat-1) & ((length(which(apply(ct, 1, sum) == 0)) != (nbcat-1)) | (length(which(apply(ct, 1, sum) == 0)) == (nbcat-1)) & sum(diag(ct)) == 0))) { ct <- ct + matrix(1, ncol=nbcat, nrow=nbcat) } ### add element to categories if nbcat-1 predictive categories do not contain elements. Not in case where all are correct!
+	
+	if(sum(ct, na.rm=TRUE) <= 0) { return(NA) }
+	
+	myx <- matrix(TRUE, nrow=nrow(ct), ncol=ncol(ct))
+	diag(myx) <- FALSE
+	if(sum(ct[myx]) == 0) { return(1) }
+	myperf <- 0
+	for(k in 1:nbcat) {
+		for(m in 1:nbcat) {
+			for(l in 1:nbcat) {
+				myperf <- myperf + ((ct[k, k] * ct[m, l]) - (ct[l, k] * ct[k, m]))
+			}
+		}
+	}
+	aa <- 0
+	for(k in 1:nbcat) {
+		cc <- 0
+		for(l in 1:nbcat) { cc <- cc + ct[l, k] }
+		dd <- 0
+		for(f in 1:nbcat) {
+			for(g in 1:nbcat) { if(f != k) { dd <- dd + ct[g, f] } }
+		}
+		aa <- aa + (cc * dd)
+	}
+	bb <- 0
+	for(k in 1:nbcat) {
+		cc <- 0
+		for(l in 1:nbcat) { cc <- cc + ct[k, l] }
+		dd <- 0
+		for(f in 1:nbcat) {
+			for(g in 1:nbcat) { if(f != k) { dd <- dd + ct[f, g] } }
+		}
+		bb <- bb + (cc * dd)
+	}
+	
+	myperf <- myperf / (sqrt(aa) * sqrt(bb))
+	return(myperf)
+}
+
+`mcc` <- 
+function(x, y, nperm=1000, setseed=12345, nthread=1) {
+  set.seed(setseed)
+  if ((length(x) != length(y)) || (!is.factor(x) || levels(x) < 2) || (!is.factor(y) || levels(y) < 2)) { stop("x and y must be factors of the same length with at least two levels") }
+  res <- c("mcc"=NA, "p"=NA)
+  ## compute MCC
+  res["mcc"] <- .mcc(ct=table(x, y))
+  ## compute significance of MCC using a permutation test
+  if (nperm > 0) {
+    splitix <- parallel::splitIndices(nx=nperm, ncl=nthread)
+    splitix <- splitix[sapply(splitix, length) > 0]
+    mcres <- parallel::mclapply(splitix, function(x, xx, yy) {
+      res <- sapply(x, function(x, xx, yy) {
+        xx <- sample(xx)
+        yy <- sample(yy)
+        return (.mcc(ct=table(xx, yy)))
+      }, xx=xx, yy=yy)
+      return (res)
+    }, xx=x, yy=y)
+    mcres <- unlist(mcres)
+    res["p"] <- sum(mcres > res["mcc"]) / sum(!is.na(mcres))
+    if (res["p"] == 0) { res["p"] <- 1 / (nperm + 1) }
+  }
+  return (res)
+}
+  
+  
 ## or use gPdtest::gpd.test
 pareto.mle <- function (x) {
   xm <- min(x)
@@ -113,6 +189,18 @@ celfileChip <- function(filename) {
 	return(as.character(h$cdfName))
 }
 
+spearmanCI <- function(x, n, alpha=0.05) {
+    require(survcomp)
+    zz <- sqrt((n-3)/1.06) * survcomp::fisherz(x)
+    zz.se <- 1/sqrt(n - 3)
+    ll <- zz - qnorm(p=alpha/2, lower.tail=FALSE) * zz.se
+    ll <- survcomp::fisherz(ll / sqrt((n-3)/1.06), inv=TRUE)
+    uu <- zz + qnorm(p=alpha/2, lower.tail=FALSE) * zz.se
+    uu <- survcomp::fisherz(uu/ sqrt((n-3)/1.06), inv=TRUE)
+    pp <- pnorm(q=zz, lower.tail=x<0)
+    res <- c("lower"=ll, "upper"=uu, "p.value"=pp)
+    return(res)
+}
 
 ## sample size calculation for correlation coefficients (Pearson, kendall and SPearman)
 ## Bonett, D. G., & Wright, T. A. (2000). Sample size requirements for estimating pearson, kendall and spearman correlations. Psychometrika, 65(1), 23–28. doi:10.1007/BF02294183

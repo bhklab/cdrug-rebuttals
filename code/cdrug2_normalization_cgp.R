@@ -98,21 +98,21 @@ if (!file.exists(myfn)) {
 
 ## download cell line annotations and COSMIC IDs
 ## annotations from COSMIC cell line project
-myfn <- file.path(path.cell, "tmp", "cosmic_annotations.RData")
+myfn <- file.path(path.cell, "cosmic_annotations.RData")
 if(!file.exists(myfn)) {
   message("Download COSMIC annotations for cell lines")
-  myfn2 <- file.path(path.cell, "tmp", "cosmic_cell_line_collection.txt")
+  myfn2 <- file.path(path.cell, "cosmic_cell_line_collection.txt")
   if(!file.exists(myfn2)) {
-    dir.create(file.path(path.cell, "tmp"), showWarnings=FALSE, recursive=TRUE)
-    dwl.status <- getCosmic(em="bhk.labgroup@gmail.com", passw="pharmacogenomics", directory=file.path(path.cell, "tmp"))
+    dir.create(file.path(path.cell, "dwl"), showWarnings=FALSE, recursive=TRUE)
+    dwl.status <- getCosmic(em="bhk.labgroup@gmail.com", passw="pharmacogenomics", directory=file.path(path.cell, "dwl"))
     # dwl.status <- download.file(url=sprintf("http://cancer.sanger.ac.uk/files/cosmic/current_release/CosmicCompleteExport.tsv.gz"), destfile=file.path(path.cell, "tmp", sprintf("CosmicCompleteExport.tsv.gz")), quiet=TRUE)
     if(dwl.status != 0) { stop("Download failed, please rerun the pipeline") }
     ## untar
-    res <- R.utils::gunzip(filename=file.path(path.cell, "tmp", sprintf("CosmicCompleteExport.tsv.gz")), overwrite=TRUE)
-    file.copy(from=file.path(path.cell, "tmp", "CosmicCompleteExport.tsv"), to=myfn2)
+    res <- R.utils::gunzip(filename=file.path(path.cell, "dwl", "CosmicCompleteExport.tsv.gz"), overwrite=TRUE)
+    file.copy(from=file.path(path.cell, "dwl", "CosmicCompleteExport.tsv"), to=myfn2)
   }
   message("Process COSMIC annotations")
-  cosmic.celline <- read.csv(file=file.path(path.cell, "tmp", "cosmic_cell_line_collection.txt"), sep="\t")
+  cosmic.celline <- read.csv(file=myfn2, sep="\t")
   # cosmic.celline <- cosmic.celline[- c(grep("row selected", cosmic.celline[ ,1]), grep("rows selected", cosmic.celline[ ,1])), , drop=FALSE]
   cosmic.celline <- cosmic.celline[complete.cases(cosmic.celline[ , c("Sample.name", "Sample.source")]) & cosmic.celline[ , "Sample.source"] == "cell-line", , drop=FALSE]
   cosmic.celline[cosmic.celline == "NS" | cosmic.celline == "" | cosmic.celline == " " | cosmic.celline == "  "] <- NA
@@ -170,7 +170,7 @@ if(!file.exists(myfn)) {
 } else { load(myfn) }
 
 ## merge GDSC and COSMIC annotations through COSMIC_ID
-message("Merge COSMIC and GDSC annotations for cell liness")
+message("Merge COSMIC and GDSC annotations for cell lines")
 iix <- which(complete.cases(gdsc.celline[ , c("CELL_LINE_NAME", "COSMIC_ID")]) & !is.element(gdsc.celline[ , "COSMIC_ID"], cosmic.celline[ , "ID_sample"]) & !is.element(gdsc.celline[ , "CELL_LINE_NAME"], cosmic.celline[ , "Sample.name"]))
 tt <- data.frame(matrix(NA, nrow=nrow(cosmic.celline) + length(iix), ncol=ncol(cosmic.celline), dimnames=list(c(rownames(cosmic.celline), rownames(gdsc.celline)[iix]), colnames(cosmic.celline))))
 tt[rownames(cosmic.celline), ] <- cosmic.celline

@@ -19,7 +19,8 @@ drugsn <- gsub("drugid_", "", rownames(druginfo))
 drugs.color <- rainbow(length(drugsn), v=0.9)
 names(drugs.color) <- drugsn
 nature2013.common.cellines <- read.csv(file=file.path("code", "HaibeKains_Nature_2013_common_cellines.csv"))[ , 1]
-
+sampleinfo <- sampleinfo.cgp
+l1000.genes <- l1000.genes[intersect(rownames(annot.ge), rownames(l1000.genes)), , drop=FALSE]
 
 ########################
 ## tissue types
@@ -49,8 +50,329 @@ coltissuet <- as.character(coltissuet)
 names(coltissue) <- names(coltissuet) <- names(utissue)
 
 ########################
-## concordance of drug sensitiivty measurements
+## concordance based on AMCC
 ########################
+
+## AMCC for drug IC50 across cell lines
+myfn <- file.path(saveres, "ic50_cgp_ccle_maxmcc_across.RData")
+if (!file.exists(myfn)) {
+  pdf(file.path(saveres, "ic50_cgp_ccle_maxmcc_across.pdf"), height=5, width=9)
+  mcc.ic50 <- NULL
+  for(i in 1:nrow(druginfo)) {
+    drugn <- gsub("drugid_", "", rownames(druginfo))[i]
+    # message(sprintf("compute AMCC for %s", drugn))
+    xx <- -log10(drugpheno.cgp$IC50[, i] / 10^6)
+    yy <- -log10(drugpheno.ccle$IC50[, i] / 10^6)
+    ccix <- complete.cases(xx, yy)
+    xx2 <- rank(-xx[ccix], ties.method="first")
+    yy2 <- rank(-yy[ccix], ties.method="first")
+    mm <- NULL
+    for(j in 1:(min(max(xx2), max(yy2)) - 1)) {
+      xx3 <- factor(ifelse (xx2 <= j, "sensitive", "resistant"))
+      yy3 <- factor(ifelse (yy2 <= j, "sensitive", "resistant"))
+      tt <- table("CGP"=xx3, "CCLE"=yy3)
+      ## res <- mcc(x=xx3, y=yy3, nperm=1000, nthread=nbcore)
+      res <- mcc(x=xx3, y=yy3, nperm=0, nthread=1)
+      mm <- rbind(mm, res)
+    }
+    ## remove extreme indices
+    rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 1):nrow(mm))
+    mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+    ## compute significance only for the AMCC
+    xx3 <- factor(ifelse (xx2 <= mccix, "sensitive", "resistant"))
+    yy3 <- factor(ifelse (yy2 <= mccix, "sensitive", "resistant"))
+    mm[mccix, "p"] <- mcc(x=xx3, y=yy3, nperm=10^3, nthread=nbcore)["p"]
+    ## bonferronni correction
+    # mm[mccix, "p"] <- mm[mccix, "p"] * length(xx3)
+    if (!is.na(mm[mccix, "p"]) && mm[mccix, "p"] > 1) { mm[mccix, "p"] <- 1 }
+    mcc.ic50 <- rbind(mcc.ic50, c(mm[mccix, ], "n1"=mccix, "n2"=nrow(mm) - mccix, "n"=nrow(mm)))
+    par(mfrow=c(1, 2))
+    ## scatterplot with sperman correlation
+    myScatterPlot(xx, yy, main=drugn, xlab="IC50 (CGP)", ylab="IC50 (CCLE)")
+    rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs")
+	 oo <- sort(xx[ccix], decreasing=TRUE)
+	 abline(v=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
+	 oo <- sort(yy[ccix], decreasing=TRUE)
+	 abline(h=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
+    legend("topleft", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+    ## mcc plot
+    plot(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "mcc"], ylim=c(min(mm[-rmix, "mcc"]), 1), xlab="# sensitive cell lines", ylab="AMCC", pch=20, col="lightgrey", main=drugn)
+    lines(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "mcc"], col="darkgrey")
+    legend("topright", legend=c(sprintf("AMCC=%.2g, p=%.1E", mm[mccix, "mcc"], mm[mccix, "p"]), sprintf("# sensitive cell lines=%i", mccix)), col="white", pch=0, bty="n")
+  }
+  rownames(mcc.ic50) <- rownames(druginfo)
+  dev.off()
+  save(list=c("mcc.ic50"), compress=TRUE, file=myfn)
+} else { load(myfn) }
+mcc.ic50.across <- mcc.ic50
+
+## AMCC for drug AUC across cell lines
+myfn <- file.path(saveres, "auc_cgp_ccle_maxmcc_across.RData")
+if (!file.exists(myfn)) {
+  pdf(file.path(saveres, "auc_cgp_ccle_maxmcc_across.pdf"), height=5, width=9)
+  mcc.auc <- NULL
+  for(i in 1:nrow(druginfo)) {
+    drugn <- gsub("drugid_", "", rownames(druginfo))[i]
+    # message(sprintf("compute AMCC for %s", drugn))
+    xx <- drugpheno.cgp$AUC[ , i]
+    yy <- drugpheno.ccle$AUC[ , i]
+    ccix <- complete.cases(xx, yy)
+    xx2 <- rank(-xx[ccix], ties.method="first")
+    yy2 <- rank(-yy[ccix], ties.method="first")
+    mm <- NULL
+    for(j in 1:(min(max(xx2), max(yy2)) - 1)) {
+      xx3 <- factor(ifelse (xx2 <= j, "sensitive", "resistant"))
+      yy3 <- factor(ifelse (yy2 <= j, "sensitive", "resistant"))
+      # tt <- table("CGP"=xx3, "CCLE"=yy3)
+      ## res <- mcc(x=xx3, y=yy3, nperm=1000, nthread=nbcore)
+      res <- mcc(x=xx3, y=yy3, nperm=0, nthread=1)
+      mm <- rbind(mm, res)
+    }
+    ## remove extreme indices
+    rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 1):nrow(mm))
+    mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+    ## compute significance only for the AMCC
+    xx3 <- factor(ifelse (xx2 <= mccix, "sensitive", "resistant"))
+    yy3 <- factor(ifelse (yy2 <= mccix, "sensitive", "resistant"))
+    mm[mccix, "p"] <- mcc(x=xx3, y=yy3, nperm=10^3, nthread=nbcore)["p"]
+    ## bonferronni correction
+    # mm[mccix, "p"] <- mm[mccix, "p"] * length(xx3)
+    if (!is.na(mm[mccix, "p"]) && mm[mccix, "p"] > 1) { mm[mccix, "p"] <- 1 }
+    mcc.auc <- rbind(mcc.auc, c(mm[mccix, ], "n1"=mccix, "n2"=nrow(mm) - mccix, "n"=nrow(mm)))
+    par(mfrow=c(1, 2))
+    ## scatterplot with sperman correlation
+    myScatterPlot(xx, yy, main=drugn, xlab="AUC (CGP)", ylab="AUC (CCLE)")
+    rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs")
+	 oo <- sort(xx[ccix], decreasing=TRUE)
+	 abline(v=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
+	 oo <- sort(yy[ccix], decreasing=TRUE)
+	 abline(h=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
+    legend("topleft", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+    ## mcc plot
+    plot(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "mcc"], ylim=c(min(mm[-rmix, "mcc"]), 1), xlab="# sensitive cell lines", ylab="AMCC", pch=20, col="lightgrey", main=drugn)
+    lines(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "mcc"], col="darkgrey")
+    legend("topright", legend=c(sprintf("AMCC=%.2g, p=%.1E", mm[mccix, "mcc"], mm[mccix, "p"]), sprintf("# sensitive cell lines=%i", mccix)), col="white", pch=0, bty="n")
+  }
+  rownames(mcc.auc) <- rownames(druginfo)
+  dev.off()
+  save(list=c("mcc.auc"), compress=TRUE, file=myfn)
+} else { load(myfn) }
+mcc.auc.across <- mcc.auc
+
+## AMCC for gene expression across cell lines
+myfn <- file.path(saveres, "ge_cgp_ccle_maxmcc_across.RData")
+if (!file.exists(myfn)) {
+  splitix <- parallel::splitIndices(nx=nrow(l1000.genes), ncl=nthread)
+  splitix <- splitix[sapply(splitix, length) > 0]
+  mcres <- parallel::mclapply(splitix, function(x, xx, yy, min.cat) {
+    res <- t(sapply(x, function(x, xx, yy, min.cat) {
+      xx <- xx[ , x]
+      yy <- yy[ , x]
+      ccix <- complete.cases(xx, yy)
+      xx2 <- rank(-xx[ccix], ties.method="first")
+      yy2 <- rank(-yy[ccix], ties.method="first")
+      mm <- NULL
+      for(j in 1:(min(max(xx2), max(yy2)) - 1)) {
+        xx3 <- factor(ifelse (xx2 <= j, "sensitive", "resistant"))
+        yy3 <- factor(ifelse (yy2 <= j, "sensitive", "resistant"))
+        # tt <- table("CGP"=xx3, "CCLE"=yy3)
+        ## res <- mcc(x=xx3, y=yy3, nperm=1000, nthread=nbcore)
+        res <- mcc(x=xx3, y=yy3, nperm=0, nthread=1)
+        mm <- rbind(mm, res)
+      }
+      ## remove extreme indices
+      rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 1):nrow(mm))
+      mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+      ## compute significance only for the AMCC
+      # xx3 <- factor(ifelse (xx2 <= mccix, "sensitive", "resistant"))
+      # yy3 <- factor(ifelse (yy2 <= mccix, "sensitive", "resistant"))
+      # mm[mccix, "p"] <- mcc(x=xx3, y=yy3, nperm=10^3, nthread=nbcore)["p"]
+      ## bonferronni correction
+      # mm[mccix, "p"] <- mm[mccix, "p"] * length(xx3)
+      # if (!is.na(mm[mccix, "p"]) && mm[mccix, "p"] > 1) { mm[mccix, "p"] <- 1 }
+      return (mm[mccix, ])
+    }, xx=xx, yy=yy, min.cat=min.cat))
+    return (res)
+  }, xx=data.ge.cgp[ , rownames(l1000.genes), drop=FALSE], yy=data.ge.ccle[ , rownames(l1000.genes), drop=FALSE], min.cat=min.cat)
+  mcc.ge <- do.call(rbind, mcres)
+  # rownames(mcc.ge) <- rownames(annot.ge)
+  rownames(mcc.ge) <- rownames(l1000.genes)
+  save(list=c("mcc.ge"), compress=TRUE, file=myfn)
+} else { load(myfn) }
+mcc.ge.across <- mcc.ge
+
+## AMCC for drug IC50 between cell lines
+myfn <- file.path(saveres, "ic50_cgp_ccle_maxmcc_between.RData")
+if (!file.exists(myfn)) {
+  # pdf(file.path(saveres, "ic50_cgp_ccle_maxmcc_between.pdf"), height=5, width=9)
+  mcc.ic50 <- NULL
+  for(i in 1:nrow(sampleinfo)) {
+    celln <- rownames(sampleinfo)[i]
+    # message(sprintf("compute AMCC for %s", celln))
+    xx <- -log10(drugpheno.cgp$IC50[i, ] / 10^6)
+    yy <- -log10(drugpheno.ccle$IC50[i, ] / 10^6)
+    ccix <- complete.cases(xx, yy)
+    if (sum(ccix) >= (2 * min.cat)) {
+      xx2 <- rank(-xx[ccix], ties.method="first")
+      yy2 <- rank(-yy[ccix], ties.method="first")
+      mm <- NULL
+      for(j in 1:(min(max(xx2), max(yy2)) - 1)) {
+        xx3 <- factor(ifelse (xx2 <= j, "sensitive", "resistant"))
+        yy3 <- factor(ifelse (yy2 <= j, "sensitive", "resistant"))
+        # tt <- table("CGP"=xx3, "CCLE"=yy3)
+        ## res <- mcc(x=xx3, y=yy3, nperm=1000, nthread=nbcore)
+        res <- mcc(x=xx3, y=yy3, nperm=0, nthread=1)
+        mm <- rbind(mm, res)
+      }
+      ## remove extreme indices
+      rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 2):nrow(mm))
+      mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+      ## compute significance only for the AMCC
+      xx3 <- factor(ifelse (xx2 <= mccix, "sensitive", "resistant"))
+      yy3 <- factor(ifelse (yy2 <= mccix, "sensitive", "resistant"))
+      mm[mccix, "p"] <- mcc(x=xx3, y=yy3, nperm=10^3, nthread=nbcore)["p"]
+      ## bonferronni correction
+      # mm[mccix, "p"] <- mm[mccix, "p"] * length(xx3)
+      if (!is.na(mm[mccix, "p"]) && mm[mccix, "p"] > 1) { mm[mccix, "p"] <- 1 }
+      mcc.ic50 <- rbind(mcc.ic50, c(mm[mccix, ], "n1"=mccix, "n2"=nrow(mm) - mccix, "n"=nrow(mm)))
+      # par(mfrow=c(1, 2))
+      # ## scatterplot with sperman correlation
+      # myScatterPlot(xx, yy, main=celln, xlab="IC50 (CGP)", ylab="IC50 (CCLE)")
+      # rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs")
+      # legend("topright", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# drugs=%i", sum(ccix))), col="white", pch=0, bty="n")
+      # ## mcc plot
+      # plot(x=(1:nrow(mm))[-rmix], y=mm[-rmix, "mcc"], ylim=c(min(mm[-rmix, "mcc"]), 1), xlab="# drugs", ylab="MCC", pch=20, col="lightgrey", main=celln)
+      # lines(x=(1:nrow(mm))[-rmix], y=mm[-rmix, "mcc"], col="grey")
+      # legend("topright", legend=c(sprintf("AMCC=%.2g, p=%.1E", mm[mccix, "mcc"], mm[mccix, "p"]), sprintf("# effective drugs=%i", mccix)), col="white", pch=0, bty="n")
+    } else {
+      mcc.ic50 <- rbind(mcc.ic50, c("mcc"=NA, "p"=NA, "n1"=0, "n2"=0, "n"=sum(ccix)))
+    }
+  }
+  rownames(mcc.ic50) <- rownames(sampleinfo)
+  save(list=c("mcc.ic50"), compress=TRUE, file=myfn)
+} else { load(myfn) }
+mcc.ic50.between <- mcc.ic50
+
+## AMCC for drug AUC between cell lines
+myfn <- file.path(saveres, "auc_cgp_ccle_maxmcc_between.RData")
+if (!file.exists(myfn)) {
+  # pdf(file.path(saveres, "auc_cgp_ccle_maxmcc_between.pdf"), height=5, width=9)
+  mcc.auc <- NULL
+  for(i in 1:nrow(sampleinfo)) {
+    celln <- rownames(sampleinfo)[i]
+    # message(sprintf("compute AMCC for %s", celln))
+    xx <- drugpheno.cgp$AUC[i, ]
+    yy <- drugpheno.ccle$AUC[i, ]
+    ccix <- complete.cases(xx, yy)
+    if (sum(ccix) >= (2 * min.cat)) {
+      xx2 <- rank(-xx[ccix], ties.method="first")
+      yy2 <- rank(-yy[ccix], ties.method="first")
+      mm <- NULL
+      for(j in 1:(min(max(xx2), max(yy2)) - 1)) {
+        xx3 <- factor(ifelse (xx2 <= j, "sensitive", "resistant"))
+        yy3 <- factor(ifelse (yy2 <= j, "sensitive", "resistant"))
+        # tt <- table("CGP"=xx3, "CCLE"=yy3)
+        ## res <- mcc(x=xx3, y=yy3, nperm=1000, nthread=nbcore)
+        res <- mcc(x=xx3, y=yy3, nperm=0, nthread=1)
+        mm <- rbind(mm, res)
+      }
+      ## remove extreme indices
+      rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 2):nrow(mm))
+      mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+      ## compute significance only for the AMCC
+      xx3 <- factor(ifelse (xx2 <= mccix, "sensitive", "resistant"))
+      yy3 <- factor(ifelse (yy2 <= mccix, "sensitive", "resistant"))
+      mm[mccix, "p"] <- mcc(x=xx3, y=yy3, nperm=10^3, nthread=nbcore)["p"]
+      ## bonferronni correction
+      # mm[mccix, "p"] <- mm[mccix, "p"] * length(xx3)
+      if (!is.na(mm[mccix, "p"]) && mm[mccix, "p"] > 1) { mm[mccix, "p"] <- 1 }
+      mcc.auc <- rbind(mcc.auc, c(mm[mccix, ], "n1"=mccix, "n2"=nrow(mm) - mccix, "n"=nrow(mm)))
+      # par(mfrow=c(1, 2))
+      # ## scatterplot with sperman correlation
+      # myScatterPlot(xx, yy, main=celln, xlab="AUC (CGP)", ylab="AUC (CCLE)")
+      # rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs")
+      # legend("topright", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# drugs=%i", sum(ccix))), col="white", pch=0, bty="n")
+      # ## mcc plot
+      # plot(x=(1:nrow(mm))[-rmix], y=mm[-rmix, "mcc"], ylim=c(min(mm[-rmix, "mcc"]), 1), xlab="# drugs", ylab="MCC", pch=20, col="lightgrey", main=celln)
+      # lines(x=(1:nrow(mm))[-rmix], y=mm[-rmix, "mcc"], col="grey")
+      # legend("topright", legend=c(sprintf("AMCC=%.2g, p=%.1E", mm[mccix, "mcc"], mm[mccix, "p"]), sprintf("# effective drugs=%i", mccix)), col="white", pch=0, bty="n")
+    } else {
+      mcc.auc <- rbind(mcc.auc, c("mcc"=NA, "p"=NA, "n1"=0, "n2"=0, "n"=sum(ccix)))
+    }
+  }
+  rownames(mcc.auc) <- rownames(sampleinfo)
+  save(list=c("mcc.auc"), compress=TRUE, file=myfn)
+} else { load(myfn) }
+mcc.auc.between <- mcc.auc
+
+## AMCC for gene expression between cell lines
+myfn <- file.path(saveres, "ge_cgp_ccle_maxmcc_between.RData")
+if (!file.exists(myfn)) {
+  mcc.ge <- NULL
+  for(i in 1:nrow(sampleinfo)) {
+    celln <- rownames(sampleinfo)[i]
+    # message(sprintf("compute AMCC for %s", celln))
+    xx <- data.ge.cgp[i, rownames(l1000.genes)]
+    yy <- data.ge.ccle[i, rownames(l1000.genes)]
+    ccix <- complete.cases(xx, yy)
+    if (sum(ccix) >= (2 * min.cat)) {
+      xx2 <- rank(-xx[ccix], ties.method="first")
+      yy2 <- rank(-yy[ccix], ties.method="first")
+      mm <- NULL
+      for(j in 1:(min(max(xx2), max(yy2)) - 1)) {
+        xx3 <- factor(ifelse (xx2 <= j, "sensitive", "resistant"))
+        yy3 <- factor(ifelse (yy2 <= j, "sensitive", "resistant"))
+        # tt <- table("CGP"=xx3, "CCLE"=yy3)
+        ## res <- mcc(x=xx3, y=yy3, nperm=1000, nthread=nbcore)
+        res <- mcc(x=xx3, y=yy3, nperm=0, nthread=1)
+        mm <- rbind(mm, res)
+      }
+      ## remove extreme indices
+      rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 2):nrow(mm))
+      mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+      ## compute significance only for the AMCC
+      xx3 <- factor(ifelse (xx2 <= mccix, "sensitive", "resistant"))
+      yy3 <- factor(ifelse (yy2 <= mccix, "sensitive", "resistant"))
+      mm[mccix, "p"] <- mcc(x=xx3, y=yy3, nperm=10^3, nthread=nbcore)["p"]
+      ## bonferronni correction
+      # mm[mccix, "p"] <- mm[mccix, "p"] * length(xx3)
+      if (!is.na(mm[mccix, "p"]) && mm[mccix, "p"] > 1) { mm[mccix, "p"] <- 1 }
+      mcc.ge <- rbind(mcc.ge, c(mm[mccix, ], "n1"=mccix, "n2"=nrow(mm) - mccix, "n"=nrow(mm)))
+      # par(mfrow=c(1, 2))
+      # ## scatterplot with sperman correlation
+      # myScatterPlot(xx, yy, main=celln, xlab="AUC (CGP)", ylab="AUC (CCLE)")
+      # rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs")
+      # legend("topright", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# drugs=%i", sum(ccix))), col="white", pch=0, bty="n")
+      # ## mcc plot
+      # plot(x=(1:nrow(mm))[-rmix], y=mm[-rmix, "mcc"], ylim=c(min(mm[-rmix, "mcc"]), 1), xlab="# drugs", ylab="MCC", pch=20, col="lightgrey", main=celln)
+      # lines(x=(1:nrow(mm))[-rmix], y=mm[-rmix, "mcc"], col="grey")
+      # legend("topright", legend=c(sprintf("AMCC=%.2g, p=%.1E", mm[mccix, "mcc"], mm[mccix, "p"]), sprintf("# effective drugs=%i", mccix)), col="white", pch=0, bty="n")
+    } else {
+      mcc.ge <- rbind(mcc.ge, c("mcc"=NA, "p"=NA, "n1"=0, "n2"=0, "n"=sum(ccix)))
+    }
+  }
+  rownames(mcc.ge) <- rownames(sampleinfo)
+  save(list=c("mcc.ge"), compress=TRUE, file=myfn)
+} else { load(myfn) }
+mcc.ge.between <- mcc.ge
+
+
+## boxplot of MCC
+pdf(file.path(saveres, "boxplot_maxmcc_across.pdf"), width=6, height=6)
+ll <- list("GE"=mcc.ge.across[ , "mcc"], "AUC"=mcc.auc.across[ , "mcc"], "IC50"=mcc.ic50.across[ , "mcc"])
+kt <- kruskal.test(x=ll)
+wt1 <- wilcox.test(x=ll$GE, y=ll$AUC)
+wt2 <- wilcox.test(x=ll$GE, y=ll$IC50)
+boxplot(ll, ylab="AMCC", main="Concordance across cell lines", pch=20, col="lightgrey", sub=sprintf("GE vs. AUC=%.1E\nGE vs. IC50=%.1E", wt1$p.value, wt2$p.value), border=c("black", "red", "red"))
+dev.off()
+
+pdf(file.path(saveres, "boxplot_maxmcc_between.pdf"), width=6, height=6)
+ll <- list("GE"=mcc.ge.between[ , "mcc"], "AUC"=mcc.auc.between[ , "mcc"], "IC50"=mcc.ic50.between[ , "mcc"])
+kt <- kruskal.test(x=ll)
+wt1 <- wilcox.test(x=ll$GE, y=ll$AUC)
+wt2 <- wilcox.test(x=ll$GE, y=ll$IC50)
+boxplot(ll, ylab="AMCC", main="Concordance between cell lines", pch=20, col="lightgrey", sub=sprintf("GE vs. AUC=%.1E\nGE vs. IC50=%.1E", wt1$p.value, wt2$p.value), border=c("black", "red", "red"))
+dev.off()
 
 ## create tables summarizing all the correlations
 tt <- matrix(NA, nrow=length(drugsn), ncol=2, dimnames=list(drugsn, c("drug.sensitivity", "gene.drug")))
@@ -197,10 +519,11 @@ dev.off()
 myfn <- file.path(saveres, "cgp_ccle_concordance_across_cellines.RData")
 if (!file.exists(myfn)) {
   ## correlation for gene expression across cell lines
-  gg <- rownames(annot.ge)
+  # gg <- rownames(annot.ge)
+  gg <- rownames(l1000.genes)
   ge.cor <- sapply(gg, function (x, d1, d2) {
     return (cor(d1[ , x], d2[ , x], method="spearman", use="pairwise.complete.obs"))
-  }, d1=data.ge.cgp, d2=data.ge.ccle)
+  }, d1=data.ge.cgp[ , rownames(l1000.genes), drop=FALSE], d2=data.ge.ccle[ , rownames(l1000.genes), drop=FALSE])
   ## correlation for ic50 across cell lines
   dd <- rownames(druginfo)
   ic50.cor <- sapply(dd, function (x, d1, d2) {
@@ -250,11 +573,11 @@ if (!file.exists(myfn)) {
 
 pdf(file.path(saveres, "cgp_ccle_cor_across_cellines_boxplot.pdf"))
 ## test significance of the difference between genomic and drug sensitivity data
-w1 <- wilcox.test(x=ge.cor, y=ic50.cor, conf.int=TRUE)
-w2 <- wilcox.test(x=ge.cor, y=auc.cor, conf.int=TRUE)
+w1 <- wilcox.test(x=ge.cor, y=auc.cor, conf.int=TRUE)
+w2 <- wilcox.test(x=ge.cor, y=ic50.cor, conf.int=TRUE)
 yylim <- c(-1, 1)
-ss <- sprintf("GE vs. IC50 calls = %.1E\nGE vs. AUC calls = %.1E", w1$p.value, w2$p.value)
-boxplot(list("GE"=ge.cor, "IC50"=ic50.cor, "AUC"=auc.cor), main="Concordance across cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim)
+ss <- sprintf("GE vs. AUC = %.1E\nGE vs. IC50 = %.1E", w1$p.value, w2$p.value)
+boxplot(list("GE"=ge.cor, "AUC"=auc.cor, "IC50"=ic50.cor), main="Concordance across cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim)
 dev.off()
 
 pdf(file.path(saveres, "cgp_ccle_kappa_across_cellines_boxplot.pdf"))
@@ -276,7 +599,7 @@ if (!file.exists(myfn)) {
   ## correlation for gene expression across cell lines
   ge.cor <- sapply(cellid, function (x, d1, d2) {
     return (cor(d1[x, ], d2[x, ], method="spearman", use="pairwise.complete.obs"))
-  }, d1=data.ge.cgp, d2=data.ge.ccle)
+  }, d1=data.ge.cgp[ , rownames(l1000.genes), drop=FALSE], d2=data.ge.ccle[ , rownames(l1000.genes), drop=FALSE])
   ## correlation for ic50 across cell lines
   ic50.cor <- sapply(cellid, function (x, d1, d2) {
     return (cor(d1[x, ], d2[x, ], method="spearman", use="pairwise.complete.obs"))
@@ -323,11 +646,11 @@ if (!file.exists(myfn)) {
 
 pdf(file.path(saveres, "cgp_ccle_cor_between_cellines_boxplot.pdf"))
 ## test significance of the difference between genomic and drug sensitivity data
-w1 <- wilcox.test(x=ge.cor, y=ic50.cor, conf.int=TRUE)
-w2 <- wilcox.test(x=ge.cor, y=auc.cor, conf.int=TRUE)
+w1 <- wilcox.test(x=ge.cor, y=auc.cor, conf.int=TRUE)
+w2 <- wilcox.test(x=ge.cor, y=ic50.cor, conf.int=TRUE)
 yylim <- c(-1, 1)
-ss <- sprintf("GE vs. IC50 calls = %.1E\nGE vs. AUC calls = %.1E", w1$p.value, w2$p.value)
-boxplot(list("GE"=ge.cor, "IC50"=ic50.cor, "AUC"=auc.cor), main="Concordance between cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim)
+ss <- sprintf("GE vs. AUC = %.1E\nGE vs. IC50 = %.1E", w1$p.value, w2$p.value)
+boxplot(list("GE"=ge.cor, "AUC"=auc.cor, "IC50"=ic50.cor), main="Concordance between cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim)
 dev.off()
 
 pdf(file.path(saveres, "cgp_ccle_kappa_between_cellines_boxplot.pdf"))

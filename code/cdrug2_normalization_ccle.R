@@ -111,7 +111,7 @@ if (!file.exists(myfn)) {
 }
 
 ########################
-## normalizae and format data
+## normalize and format data
 ########################
 myfn <- file.path(saveres, "ccle_data.RData")
 if(!file.exists(myfn)) {
