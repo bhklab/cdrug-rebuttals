@@ -2,7 +2,18 @@
 ## Benjamin Haibe-Kains
 ## Code under License Artistic-2.0
 ## April 8, 2014
+## March 1, 2015
 ########################
+
+## TODO
+## Fig 1: boxplot of correlation across and between cell lines
+## Fig 2: gene-drug association using Geeleher's approach -> logistic regression with 15 most sensitive vs 55 most resistant
+## Fig 3: new plot for published AUC with red points
+## Explanation of AMCC in SI
+## Fig 4: AMCC
+## Fig 5: AMCC for CGP replicates camptothecin
+## Fig 6: boxplot for AMCC for (full) gene expression and published AUC
+## find biomarkers reported by Hunag in our suppl tables
 
 
 require(amap) || stop("Library amap is not available!")
@@ -54,9 +65,9 @@ names(coltissue) <- names(coltissuet) <- names(utissue)
 ########################
 
 ## AMCC for drug IC50 across cell lines
-myfn <- file.path(saveres, "ic50_cgp_ccle_maxmcc_across.RData")
+myfn <- file.path(saveres, "ic50_cgp_ccle_amcc_across.RData")
 if (!file.exists(myfn)) {
-  pdf(file.path(saveres, "ic50_cgp_ccle_maxmcc_across.pdf"), height=5, width=9)
+  pdf(file.path(saveres, "ic50_cgp_ccle_amcc_across.pdf"), height=5, width=9)
   mcc.ic50 <- NULL
   for(i in 1:nrow(druginfo)) {
     drugn <- gsub("drugid_", "", rownames(druginfo))[i]
@@ -107,9 +118,9 @@ if (!file.exists(myfn)) {
 mcc.ic50.across <- mcc.ic50
 
 ## AMCC for drug AUC across cell lines
-myfn <- file.path(saveres, "auc_cgp_ccle_maxmcc_across.RData")
+myfn <- file.path(saveres, "auc_cgp_ccle_amcc_across.RData")
 if (!file.exists(myfn)) {
-  pdf(file.path(saveres, "auc_cgp_ccle_maxmcc_across.pdf"), height=5, width=9)
+  pdf(file.path(saveres, "auc_cgp_ccle_amcc_across.pdf"), height=5, width=9)
   mcc.auc <- NULL
   for(i in 1:nrow(druginfo)) {
     drugn <- gsub("drugid_", "", rownames(druginfo))[i]
@@ -160,7 +171,7 @@ if (!file.exists(myfn)) {
 mcc.auc.across <- mcc.auc
 
 ## AMCC for gene expression across cell lines
-myfn <- file.path(saveres, "ge_cgp_ccle_maxmcc_across.RData")
+myfn <- file.path(saveres, "ge_cgp_ccle_amcc_across.RData")
 if (!file.exists(myfn)) {
   splitix <- parallel::splitIndices(nx=nrow(l1000.genes), ncl=nthread)
   splitix <- splitix[sapply(splitix, length) > 0]
@@ -202,9 +213,9 @@ if (!file.exists(myfn)) {
 mcc.ge.across <- mcc.ge
 
 ## AMCC for drug IC50 between cell lines
-myfn <- file.path(saveres, "ic50_cgp_ccle_maxmcc_between.RData")
+myfn <- file.path(saveres, "ic50_cgp_ccle_amcc_between.RData")
 if (!file.exists(myfn)) {
-  # pdf(file.path(saveres, "ic50_cgp_ccle_maxmcc_between.pdf"), height=5, width=9)
+  # pdf(file.path(saveres, "ic50_cgp_ccle_amcc_between.pdf"), height=5, width=9)
   mcc.ic50 <- NULL
   for(i in 1:nrow(sampleinfo)) {
     celln <- rownames(sampleinfo)[i]
@@ -254,9 +265,9 @@ if (!file.exists(myfn)) {
 mcc.ic50.between <- mcc.ic50
 
 ## AMCC for drug AUC between cell lines
-myfn <- file.path(saveres, "auc_cgp_ccle_maxmcc_between.RData")
+myfn <- file.path(saveres, "auc_cgp_ccle_amcc_between.RData")
 if (!file.exists(myfn)) {
-  # pdf(file.path(saveres, "auc_cgp_ccle_maxmcc_between.pdf"), height=5, width=9)
+  # pdf(file.path(saveres, "auc_cgp_ccle_amcc_between.pdf"), height=5, width=9)
   mcc.auc <- NULL
   for(i in 1:nrow(sampleinfo)) {
     celln <- rownames(sampleinfo)[i]
@@ -306,7 +317,7 @@ if (!file.exists(myfn)) {
 mcc.auc.between <- mcc.auc
 
 ## AMCC for gene expression between cell lines
-myfn <- file.path(saveres, "ge_cgp_ccle_maxmcc_between.RData")
+myfn <- file.path(saveres, "ge_cgp_ccle_amcc_between.RData")
 if (!file.exists(myfn)) {
   mcc.ge <- NULL
   for(i in 1:nrow(sampleinfo)) {
@@ -358,7 +369,7 @@ mcc.ge.between <- mcc.ge
 
 
 ## boxplot of MCC
-pdf(file.path(saveres, "boxplot_maxmcc_across.pdf"), width=6, height=6)
+pdf(file.path(saveres, "boxplot_amcc_across.pdf"), width=6, height=6)
 ll <- list("GE"=mcc.ge.across[ , "mcc"], "AUC"=mcc.auc.across[ , "mcc"], "IC50"=mcc.ic50.across[ , "mcc"])
 kt <- kruskal.test(x=ll)
 wt1 <- wilcox.test(x=ll$GE, y=ll$AUC)
@@ -366,7 +377,7 @@ wt2 <- wilcox.test(x=ll$GE, y=ll$IC50)
 boxplot(ll, ylab="AMCC", main="Concordance across cell lines", pch=20, col="lightgrey", sub=sprintf("GE vs. AUC=%.1E\nGE vs. IC50=%.1E", wt1$p.value, wt2$p.value), border=c("black", "red", "red"))
 dev.off()
 
-pdf(file.path(saveres, "boxplot_maxmcc_between.pdf"), width=6, height=6)
+pdf(file.path(saveres, "boxplot_amcc_between.pdf"), width=6, height=6)
 ll <- list("GE"=mcc.ge.between[ , "mcc"], "AUC"=mcc.auc.between[ , "mcc"], "IC50"=mcc.ic50.between[ , "mcc"])
 kt <- kruskal.test(x=ll)
 wt1 <- wilcox.test(x=ll$GE, y=ll$AUC)

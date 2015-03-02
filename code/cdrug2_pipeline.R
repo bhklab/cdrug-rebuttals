@@ -144,6 +144,9 @@ if (progress.log["step.3", "progress"] != "done") {
 }
 message("\t-> DONE")
 
+#######################
+## intersection of CGP and CCLE
+
 message("\n-------------------------------------\n| Intersection between GGP and CCLE |\n-------------------------------------")
 if (progress.log["step.4", "progress"] != "done") {
   progress.log["step.4", "progress"] <- "in progress"
