@@ -401,7 +401,7 @@ callingWaterfallAUC <- function (x, drug.class=c("Unspecified", "Targeted", "Cyt
   drug.class <- match.arg(drug.class)
   if (drug.class == "Unspecified") {
     ## using the KS statistics on the pareto distribution of AUC values
-    ks.stat <- pareto.test(x=xx, B=1000)$D    
+    ks.stat <- pareto.test(x=xx, B=1000)$D
     if (ks.stat >= drug.ks) {
       drug.class <- "Cytotoxic"
     } else {
