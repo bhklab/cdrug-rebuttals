@@ -345,46 +345,50 @@ if(!file.exists(myfn)) {
   rownames(dd) <- cellnall
   mutation <- dd
 
-  ## reproducibility between different screening sites
-  ## camptothecin was screened at MGH (drug id 195) and WTSI (drug id 1003)
-  ## data only available in the supplementary infomration of the Nature website
-  myfn2 <- file.path(saveres, "nature_supplinfo_drugpheno_cgp.RData")
-  if(!file.exists(myfn2)) {
-    drugpheno.nature <- gdata::read.xls(xls=file.path(path.drug, "nature_supplementary_information.xls"), sheet=2)
-    drugpheno.nature[drugpheno.nature == "" | drugpheno.nature == " "] <- NA
-    save(list="drugpheno.nature", compress=TRUE, file=myfn2)
-  } else { load(myfn2) }
-  ## format column names
-  coln2 <- gsub(" ", "", sapply(drugpheno.nature[1,], as.character))
-  coln2[coln2 == ""] <- NA
-  drugpheno.nature <- drugpheno.nature[-1, ,drop=FALSE]
-  coln <- colnames(drugpheno.nature)
-  coln2[is.na(coln2)] <- coln[is.na(coln2)]
-  coln2 <- genefu::rename.duplicate(x=coln2, sep="_dupl")$new.x
-  myx <- sapply(sapply(strsplit(coln2, "_"), function(x) { return(x[[1]]) }), Hmisc::all.is.numeric)
-  coln2[myx] <- paste("drugid", gsub(pattern=badchars, replacement="_", x=toupper(coln2[myx])), sep="_")
-  colnames(drugpheno.nature) <- coln2
-  rownames(drugpheno.nature) <- as.character(drugpheno.nature[ , "Cell.Line"])
-  myx <- sapply(strsplit(colnames(drugpheno.nature), "_"), function(x) { return(all(x[c(length(x)-1, length(x))] == c("IC", "50"))) })
-  ic50 <- drugpheno.nature[ , myx, drop=FALSE]
-  nn <- dimnames(ic50)
-  nn[[2]] <- gsub("_IC_50", "", nn[[2]])
-  ic50 <- apply(ic50, 2, as.numeric)
-  dimnames(ic50) <- nn
-  ic50 <- exp(ic50) / 10^6
-  ## camptothecin
-  pdf(file.path(saveres, "cgp_camptothecin_mgh_wtsi_paper.pdf"))
-  yy <- -log10(ic50[ , "drugid_195", drop=FALSE])
-  xx <- -log10(ic50[ , "drugid_1003", drop=FALSE])
-  ccix <- complete.cases(xx, yy)
-  nnn <- sum(ccix)
-  cc <- cor.test(x=xx, y=yy, method="spearman", use="complete.obs", alternative="greater")
-  cci <- spearmanCI(x=cc$estimate, n=sum(ccix))
-  par(mar=c(4, 4, 3, 1) + 0.1)
-  llim <- round(range(c(xx, yy), na.rm=TRUE) * 10) / 10
-  myScatterPlot(x=xx, y=yy, xlab="-log10 IC50 (WTSI)", ylab="-log10 IC50 (MGH)", main="CAMPTOTHECIN", pch=16, method="transparent", transparency=0.75)
-  legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E, n=%i", cc$estimate, cc$p.value, nnn), text.font=2)
-  dev.off()
+	## reproducibility between different screening sites
+	## camptothecin was screened at MGH (drug id 195) and WTSI (drug id 1003)
+	## data only available in the supplementary infomration of the Nature website
+	myfn2 <- file.path(saveres, "nature_supplinfo_drugpheno_cgp.RData")
+	if(!file.exists(myfn2)) {
+	 drugpheno.nature <- gdata::read.xls(xls=file.path(path.drug, "nature_supplementary_information.xls"), sheet=2)
+	 drugpheno.nature[drugpheno.nature == "" | drugpheno.nature == " "] <- NA
+	 save(list="drugpheno.nature", compress=TRUE, file=myfn2)
+	} else { load(myfn2) }
+	## format column names
+	coln2 <- gsub(" ", "", sapply(drugpheno.nature[1,], as.character))
+	coln2[coln2 == ""] <- NA
+	drugpheno.nature <- drugpheno.nature[-1, ,drop=FALSE]
+	coln <- colnames(drugpheno.nature)
+	coln2[is.na(coln2)] <- coln[is.na(coln2)]
+	coln2 <- genefu::rename.duplicate(x=coln2, sep="_dupl")$new.x
+	myx <- sapply(sapply(strsplit(coln2, "_"), function(x) { return(x[[1]]) }), Hmisc::all.is.numeric)
+	coln2[myx] <- paste("drugid", gsub(pattern=badchars, replacement="_", x=toupper(coln2[myx])), sep="_")
+	colnames(drugpheno.nature) <- coln2
+	rownames(drugpheno.nature) <- as.character(drugpheno.nature[ , "Cell.Line"])
+	myx <- sapply(strsplit(colnames(drugpheno.nature), "_"), function(x) { return(all(x[c(length(x)-1, length(x))] == c("IC", "50"))) })
+	ic50 <- drugpheno.nature[ , myx, drop=FALSE]
+	nn <- dimnames(ic50)
+	nn[[2]] <- gsub("_IC_50", "", nn[[2]])
+	ic50 <- apply(ic50, 2, as.numeric)
+	dimnames(ic50) <- nn
+	ic50 <- exp(ic50) / 10^6
+	## camptothecin
+	pdf(file.path(saveres, "cgp_camptothecin_mgh_wtsi_paper.pdf"))
+	yy <- -log10(ic50[ , "drugid_195", drop=FALSE])
+	xx <- -log10(ic50[ , "drugid_1003", drop=FALSE])
+	ccix <- complete.cases(xx, yy)
+	nnn <- sum(ccix)
+	cc <- cor.test(x=xx, y=yy, method=concordance.method, use="complete.obs", alternative="greater")
+	cci <- spearmanCI(x=cc$estimate, n=sum(ccix))
+	par(mar=c(4, 4, 3, 1) + 0.1)
+	llim <- round(range(c(xx, yy), na.rm=TRUE) * 10) / 10
+	myScatterPlot(x=xx, y=yy, xlab="-log10 IC50 (WTSI)", ylab="-log10 IC50 (MGH)", main="CAMPTOTHECIN", pch=16, method="transparent", transparency=0.75)
+	legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E, n=%i", cc$estimate, cc$p.value, nnn), text.font=2)
+	dev.off()
+	cgp.camptothecin.wtsi <- ic50[ , "drugid_195", drop=FALSE]
+	cgp.camptothecin.mgh <- ic50[ , "drugid_1003", drop=FALSE]
+	save(list=c("cgp.camptothecin.wtsi", "cgp.camptothecin.mgh"), compress=TRUE, file=file.path(saveres, "cgp_camptothecin_mgh_wtsi.RData"))
+  
 
   ## drug information
   message("Read drug information")

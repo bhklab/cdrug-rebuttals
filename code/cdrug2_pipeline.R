@@ -77,6 +77,10 @@ concordance.method <- "spearman"
 fdr.cuts <- c(1, 0.5, 0.2, 0.05, 0.01)
 quantile.cuts <- c(1, 0.5, 0.2, 0.05, 0.01)
 
+## list of genes to consider for concordance
+## listg <- c("all", "l1000")
+listg <- "all"
+
 ## Broad landmark genes
 dir.create(file.path("data", "L1000", "dwl"), recursive=TRUE, showWarnings=FALSE)
 myfn <- file.path("saveres", "l1000_genes.RData")
@@ -90,7 +94,7 @@ if (!file.exists(myfn)) {
   l1000.genes <- l1000.genes[!is.na(l1000.genes[ , "Entrez.Gene.ID"]) & !duplicated(l1000.genes[ , "Entrez.Gene.ID"]), , drop=FALSE]
   rownames(l1000.genes) <- paste("geneid", as.character(l1000.genes[ , "Entrez.Gene.ID"]), sep="_")
   save(list=c("l1000.genes"), compress=TRUE, file=myfn)
-}
+} else { load(myfn) }
 
 
 ## additional functions
@@ -164,7 +168,7 @@ message("\n-------------------------------------------------------------------\n
 if (progress.log["step.5", "progress"] != "done") {
   progress.log["step.5", "progress"] <- "in progress"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
-  source(file.path("code", "cdrug2_analysis.R"))
+  source(file.path("code", "cdrug2_analysis_huang.R"))
   progress.log["step.5", "progress"] <- "done"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
 }
