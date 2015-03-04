@@ -5,17 +5,6 @@
 ## March 1, 2015
 ########################
 
-## TODO
-## Fig 1: boxplot of correlation across and between cell lines -->> DONE
-## Fig 2: gene-drug association using Geeleher's approach -> logistic regression with 15 most sensitive vs 55 most resistant
-## Fig 3: new plot for published AUC with red points -->> DONE
-## Explanation of AMCC in SI
-## Fig 4: AMCC across cell lines -->> 
-## Fig 5: AMCC for CGP replicates camptothecin
-## Fig 6: boxplot for AMCC for (full) gene expression and AUC/IC50 across cell lines -->> DONE
-## find biomarkers reported by Hunag in our suppl tables
-
-
 require(amap) || stop("Library amap is not available!")
 require(vcd) || stop("Library vcd is not available!")
 require(gplots) || stop("Library gplots is not available!")
@@ -54,14 +43,8 @@ data.ge.ccle <- data.ge.ccle[ , rownames(list.genes), drop=FALSE]
 data.ge.cgp <- data.ge.cgp[ , rownames(list.genes), drop=FALSE]
 
 ########################
-## tissue types
+## sample size per tissue types
 ########################
-
-tissue.cgp <- as.character(sampleinfo.cgp[ , "tissue.type"])
-tissue.ccle <- as.character(sampleinfo.ccle[ , "tissue.type"])
-tissue <- tissue.cgp
-tissuen <- sort(unique(as.character(tissue)))
-drugsn <- rownames(druginfo)
 
 ccelln <- intersect(rownames(sampleinfo.cgp), rownames(sampleinfo.ccle))
 tt <- table(sampleinfo.cgp[ccelln, "tissue.type"], sampleinfo.cgp[ccelln, "tissue.type"])
