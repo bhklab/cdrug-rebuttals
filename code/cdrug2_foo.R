@@ -8,9 +8,6 @@
 ## functions
 
 
-## Pareto distribution
-## http://stats.stackexchange.com/questions/78168/how-to-know-if-my-data-fits-pareto-distribution
-
 getCosmic <- function(em, passw, directory="tmp") {
   if (missing(em)) { stop ("Email must be provided") }
   if (missing(passw)) { stop ("Password must be provided") } 
@@ -27,6 +24,129 @@ getCosmic <- function(em, passw, directory="tmp") {
   close(myfl)
   unlink(file.path(directory, "cookies.txt"))
   return (0)
+}
+
+## this function read each data point in ccle/cgp and save 4 information for each data point: cell, drug, concentrations, viabilities in an standardized object
+`fnStandardizeSensitivity` <- 
+function(values, method = c("ccle","cgp"))  {
+  switch(method, 
+         "ccle"={
+           cellline = values["Primary.Cell.Line.Name"]
+           drug = values["Compound"]
+           #doses = as.numeric(unlist(strsplit(input.matrix["Doses (uM)"], split=","))) * 10 ^ 3 # convert to nano molar #nature paper raw data
+           doses = as.numeric(unlist(strsplit(values["Doses..uM."], split=","))) * 10 ^ 3 # convert to nano molar
+           
+           #responses = as.numeric(unlist(strsplit(input.matrix["Activity Data\n(raw median data)"], split=",")))  #nature paper raw data
+           responses = as.numeric(unlist(strsplit(values["Activity.Data..median."], split=","))) + 100
+         },
+         "cgp"={
+           cellline = values["CELL_LINE_NAME"]
+           drug = str_trim(values["DRUG_ID"])
+           fold_dillution = as.numeric(values["FOLD_DILUTION"])
+           max_dose = as.numeric(values["MAX_CONC"])
+           doses = rev(as.numeric(c(max_dose, unlist(lapply(1:8, function(x){max_dose/(fold_dillution ^ x)}))))) * 10 ^ 3 # convert to nano molar
+           
+           responses = as.numeric(values[grep("raw",names(values))])
+           
+           controls = values[grep("control", names(values))]#qc_fail
+           controls = as.numeric(controls[which(!is.na(controls) & controls != "qc_fail")])
+           
+           blanks = values[grep("blank", names(values))]#qc_fail
+           blanks = as.numeric(blanks[which(!is.na(blanks) & blanks != "qc_fail")])
+           
+           responses = rev((responses - mean(blanks))/(mean(controls) - mean(blanks))) * 100 #mean can be replaced by median         
+         }
+  )
+  #return(list(cell = cellline, drug = drug, doses = paste(doses, collapse = ","), responses = paste(responses, collapse = ",")))
+  obj[cellline,drug,"concentration", 1:length(doses)] <<- doses
+  obj[cellline,drug,"viability", 1:length(responses)] <<- responses
+}
+
+## this function return common concentration range between a list of two ranges 
+`fnCommonConcentrationRange` <- 
+function(ranges) {
+  
+  min.exp = which.max(c(min(as.numeric(ranges[[1]])),min(as.numeric(ranges[[2]]))))
+  max.exp = which.min(c(max(as.numeric(ranges[[1]])),max(as.numeric(ranges[[2]]))))
+  
+  switch(min.exp, 
+         "1" = {
+           First.min.dose = which.min(as.numeric(ranges[[1]]))
+           Second.min.dose = which.min(abs(as.numeric(ranges[[2]])-min(as.numeric(ranges[[1]]))))
+         },
+         "2" = {
+           First.min.dose = which.min(abs(as.numeric(ranges[[1]])-min(as.numeric(ranges[[2]]))))
+           Second.min.dose = which.min(as.numeric(ranges[[2]]))
+         })
+  
+  switch(max.exp, 
+         "1" = {
+           First.max.dose = which.max(as.numeric(ranges[[1]]))
+           Second.max.dose = which.min(abs(as.numeric(ranges[[2]])-max(ranges[[1]])))
+         },
+         "2" = {
+           First.max.dose = which.min(abs(as.numeric(ranges[[1]])-max(as.numeric(ranges[[2]]))))
+           Second.max.dose = which.max(as.numeric(ranges[[2]]))
+         })
+  return(list(ranges[[1]][First.min.dose:First.max.dose] , ranges[[2]][Second.min.dose:Second.max.dose]))
+}
+
+## this function return slope of fitted line to the data points of a given experiment
+`fnComputeSlope` <- 
+function(doses, responses, trunc = FALSE) {
+  if(trunc) {responses = pmin(responses, 100)}
+  model = lm(responses ~ log10(doses))
+  slope = round(model$coefficients[2],digits=2) 
+  return(slope)
+}
+
+## this function plot the curves for a given list of data points in both sudies
+## input: list of doses and responses for different studies
+`fnPlotDrugResponseCurve` <- 
+function(drug, cellline, doses, responses, legend.values) {
+  mycol = c("goldenrod4", "darkmagenta")
+  dose.range = c(10^10,0)
+  viability.range = c(0,10)
+  for(i in 1:length(doses))
+  {
+    dose.range = c(min(dose.range[1],min(doses[[i]])), max(dose.range[2],max(doses[[i]])))
+    viability.range = c(0, max(viability.range[2],max(responses[[i]])))
+  }
+  x1 <- 10^10; x2 <- 0
+  
+  if(length(doses) > 1)
+  {
+    common.ranges = fnCommonConcentrationRange(doses)  
+    for(i in 1:length(doses))
+    {
+      x1 <- min(x1, min(common.ranges[[i]]))
+      x2 <- max(x2, max(common.ranges[[i]]))
+    }
+  }
+  plot(NA, xlab = "Concentration (nM)",ylab="% Viability",axes =FALSE, main=sprintf("%s:%s",drug,cellline),log="x",ylim = viability.range, xlim = dose.range, pch=8,cex=.7, cex.main = .9)
+  magaxis(side=1:2,box = TRUE,tcl=-.3,majorn=c(5,3),minorn=c(5,2))
+  legends = NULL
+  legends.col = NULL
+  rect(xleft = x1  , xright = x2 , ybottom = viability.range[1] , ytop = viability.range[2] , col = rgb(221,221,221, maxColorValue = 255), border = F)
+  
+  
+  for(i in 1:length(doses))
+  {
+    points(doses[[i]],responses[[i]],pch=20,col = mycol[i])
+    lines(doses[[i]],responses[[i]],lty=1,lwd=.5,col = mycol[i])
+    legends= c(legends,sprintf("%s ST = %s", names(doses)[i], legend.values[[i]]))
+    legends.col =  c(legends.col, mycol[i])
+  }
+  if(length(doses) > 1)
+  {
+    for(i in 1:length(doses))
+    {
+      points(common.ranges[[i]],responses[[i]][names(common.ranges[[i]])],pch=8,col = mycol[i])
+    }
+  }
+  
+  legend("topright",legend=legends, col=legends.col, bty="n", cex = .7, pch = c(15,15))
+  
 }
 
 ## function to compute the Matthews Correlation Coefficient (MCC) in a classification framework
@@ -78,6 +198,7 @@ function(ct, nbcat=nrow(ct)) {
 	return(myperf)
 }
 
+## Matthews correlatipon coefficient
 `mcc` <- 
 function(x, y, nperm=1000, setseed=12345, nthread=1) {
   set.seed(setseed)
@@ -148,7 +269,7 @@ function(x, y, step.prct=0, min.cat=3, nperm=1000, setseed=12345, nthread=1) {
 	return(list("amcc"=res, "mcc"=mm))
 }
 
- 
+## Pareto distribution
 ## or use gPdtest::gpd.test
 pareto.mle <- function (x) {
   xm <- min(x)
@@ -156,6 +277,8 @@ pareto.mle <- function (x) {
   return(list(xm = xm, alpha = alpha))
 }
 
+## Pareto distribution
+## http://stats.stackexchange.com/questions/78168/how-to-know-if-my-data-fits-pareto-distribution
 pareto.test <- function (x, B=1000) {
   require(gPdtest)
   # distribution, cdf, quantile and random functions for Pareto distributions
@@ -192,6 +315,46 @@ pareto.test <- function (x, B=1000) {
   pp <- sum(emp.D > D)/B
   if (pp == 0) { pp <- 1 / (B + 1) }
   return(list("xm" = a$xm, "alpha"=a$alpha, "D"=D, "p"= pp))
+}
+
+## wrapper for jetset
+mappingJetset <- function(probes, platform=c("hgu133plus2", "hgu95av2", "hgu133a", "u133x3p")) {
+	require(jetset)
+	js <- jetset::jscores(chip="hgu133plus2", probeset=probes)
+	js <- js[probes, , drop=FALSE]
+	## identify the best probeset for each entrez gene id
+	geneid1 <- as.character(js[ ,"EntrezID"])
+	names(geneid1) <- rownames(js)
+	geneid2 <- sort(unique(geneid1))
+	names(geneid2) <- paste("geneid", geneid2, sep=".")
+	gix1 <- !is.na(geneid1)
+	gix2 <- !is.na(geneid2)
+	geneid.common <- intersect(geneid1[gix1], geneid2[gix2])
+	## probes corresponding to common gene ids
+	gg <- names(geneid1)[is.element(geneid1, geneid.common)]
+	gid <- geneid1[is.element(geneid1, geneid.common)]
+	## duplicated gene ids
+	gid.dupl <- unique(gid[duplicated(gid)])
+	gg.dupl <- names(geneid1)[is.element(geneid1, gid.dupl)]
+	## unique gene ids
+	gid.uniq <- gid[!is.element(gid, gid.dupl)]
+	gg.uniq <- names(geneid1)[is.element(geneid1, gid.uniq)]
+	## which are the best probe for each gene
+	js <- data.frame(js, "best"=FALSE)
+	js[gg.uniq, "best"] <- TRUE
+	## data for duplicated gene ids
+	if(length(gid.dupl) > 0) {
+		library(jetset)
+		## use jetset oevrall score to select the best probeset
+		myscore <- js[gg.dupl,"overall"]
+		myscore <- cbind("probe"=gg.dupl, "gid"=geneid1[gg.dupl], "score"=myscore)
+		myscore <- myscore[order(as.numeric(myscore[ , "score"]), decreasing=TRUE, na.last=TRUE), , drop=FALSE]
+		myscore <- myscore[!duplicated(myscore[ , "gid"]), , drop=FALSE]
+		js[myscore[ ,"probe"], "best"] <- TRUE
+	}
+	annot <- data.frame("probe"=rownames(js), "EntrezGene.ID"=js[ ,"EntrezID"], js)
+	annot <- annot[probes, , drop=FALSE]
+	return (annot)
 }
 
 ## compute overlap for Venn diagrams such as library VennDiagram

@@ -25,6 +25,9 @@ require(PharmacoGx) || stop("Library PharmacoGx is not available")
 require(genefu) || stop("Library genefu is not available")
 require(gdata) || stop("Library gdata is not available")
 
+## additional functions
+source(file.path("code", "cdrug2_foo.R"))
+
 ########################
 ## global parameters
 
@@ -97,17 +100,27 @@ if (!file.exists(myfn)) {
 } else { load(myfn) }
 
 
-## additional functions
-source(file.path("code", "cdrug2_foo.R"))
-
 if(!file.exists("cdrug2_log.txt")) {
-  steps <- c("cdrug2_normalization_cgp", "cdrug2_normalization_ccle", "cdrug2_normalization_gsk", "cdrug2_format", "cdrug2_analysis")
+  steps <- c("cdrug2_analysis_birtwistle", "cdrug2_normalization_cgp", "cdrug2_normalization_ccle", "cdrug2_format", "cdrug2_analysis_huang")
   progress.log <- cbind(steps, rep("...", length(steps)))
-  dimnames(progress.log) <- list(paste("step", 1:length(steps), sep="."), c("script", "progress"))
+  dimnames(progress.log) <- list(paste("step", 0:(length(steps)-1), sep="."), c("script", "progress"))
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
 } else {
     progress.log <- read.table(file=file.path("cdrug2_log.txt"), sep="\t", header=TRUE, stringsAsFactor=FALSE)
 }
+
+########################
+## re-analysis of drug sensitivitry data
+
+message("\n-----------------------------\n| Normalization of CGP data |\n-----------------------------")
+if (progress.log["step.0", "progress"] != "done") {
+  progress.log["step.0", "progress"] <- "in progress"
+  write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
+  source(file.path("code", "cdrug2_analysis_birtwistle.R"))
+  progress.log["step.0", "progress"] <- "done"
+  write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
+}
+message("\t-> DONE")
 
 ########################
 ## curation, annotation and normalization of CGP data
@@ -136,27 +149,14 @@ if (progress.log["step.2", "progress"] != "done") {
 message("\t-> DONE")
 
 #######################
-## curation, annotation and normalization of GSK data
-
-message("\n------------------------------\n| Normalization of GSK data |\n------------------------------")
-if (progress.log["step.3", "progress"] != "done") {
-  progress.log["step.3", "progress"] <- "in progress"
-  write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
-  source(file.path("code", "cdrug2_normalization_gsk.R"))
-  progress.log["step.3", "progress"] <- "done"
-  write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
-}
-message("\t-> DONE")
-
-#######################
 ## intersection of CGP and CCLE
 
 message("\n-------------------------------------\n| Intersection between GGP and CCLE |\n-------------------------------------")
-if (progress.log["step.4", "progress"] != "done") {
-  progress.log["step.4", "progress"] <- "in progress"
+if (progress.log["step.3", "progress"] != "done") {
+  progress.log["step.3", "progress"] <- "in progress"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
   source(file.path("code", "cdrug2_format.R"))
-  progress.log["step.4", "progress"] <- "done"
+  progress.log["step.3", "progress"] <- "done"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
 }
 message("\t-> DONE")
@@ -165,11 +165,11 @@ message("\t-> DONE")
 ## script performing the correlation analyses at the level of gene expressions
 
 message("\n-------------------------------------------------------------------\n| Additional analysis regarding consistency between GGP and CCLE |\n-------------------------------------------------------------------")
-if (progress.log["step.5", "progress"] != "done") {
-  progress.log["step.5", "progress"] <- "in progress"
+if (progress.log["step.4", "progress"] != "done") {
+  progress.log["step.4", "progress"] <- "in progress"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
   source(file.path("code", "cdrug2_analysis_huang.R"))
-  progress.log["step.5", "progress"] <- "done"
+  progress.log["step.4", "progress"] <- "done"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)
 }
 message("\t-> DONE")
