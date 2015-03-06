@@ -112,7 +112,7 @@ if(!file.exists("cdrug2_log.txt")) {
 ########################
 ## re-analysis of drug sensitivitry data
 
-message("\n-----------------------------\n| Normalization of CGP data |\n-----------------------------")
+message("\n---------------------------------------------\n| Re-analysis of raw drug sensitivity data |\n---------------------------------------------")
 if (progress.log["step.0", "progress"] != "done") {
   progress.log["step.0", "progress"] <- "in progress"
   write.table(progress.log, sep="\t", row.names=TRUE, col.names=TRUE, file=file.path("cdrug2_log.txt"), quote=FALSE)

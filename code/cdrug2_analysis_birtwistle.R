@@ -112,10 +112,10 @@ cgp.IC50 <- -log10(exp(as.matrix(cgp.IC50))/10^6)
 
 
 ## drug mapping
-drug.map <- read.csv(file.path(path.data,"matching_drug_CCLE_CG.csv"), row.names=1, stringsAsFactors = FALSE)
+drug.map <- read.csv(file.path(path.data,"matching_drug_CCLE_CGP.csv"), row.names=1, stringsAsFactors = FALSE)
 
 ## cell line mapping
-cell.map <- read.csv(file.path(path.data,"cell_map.csv"), row.names=1, stringsAsFactors = FALSE)
+cell.map <- read.csv(file.path(path.data,"matching_cell_line_CCLE_CGP.csv"), row.names=1, stringsAsFactors = FALSE)
 
 ## intersection between CCLE and CGP
 cix <- rownames(cell.map)[is.element(cell.map[ , "CCLE"], rownames(ccle.AUC)) & is.element(cell.map[ , "CGP"], rownames(cgp.AUC))]
