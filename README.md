@@ -1,5 +1,5 @@
-cdrug2
-======
+cdrug-rebuttals
+===============
 
 Analysis pipeline implementing the response to the rebuttal letters (Brief Arising Communication) for our paper:
 
