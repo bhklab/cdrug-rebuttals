@@ -39,8 +39,10 @@ dev.off()
 
 ### breaking down common cell lines based on tissue types
 require(xtable) || stop("Library xtable is not available!")
+require(Hmisc) || stop("Library Hmisc is not available!")
+
 tt <- table(common$CCLE@cell[, "tissueid"])
-mm <- cbind("Tissue type"=capitalize(gsub("_", " ", names(tt))), "Number of cell lines"=tt)
+mm <- cbind("Tissue type"= Hmisc::capitalize(gsub("_", " ", names(tt))), "Number of cell lines"=tt)
 mm <- mm[mm[ , 2] != 0, , drop=FALSE]
 mm <- mm[order(as.numeric(mm[ , 2]), decreasing=TRUE), , drop=FALSE]
 xtable::print.xtable(xtable::xtable(mm), include.rownames=FALSE, floating=FALSE, file="tissue_type.tex", append=FALSE)
@@ -126,9 +128,9 @@ dev.off()
 
 
 ##correlation between cell lines
-ge.between <- sapply(1:length(cellNames(common$CCLE)), function(x){cor(exprs(ccle.ge)[,x], exprs(cgp.ge)[,x], method="spearman", use="pairwise.complete.obs")})
+require(Biobase) || stop("Library Biobase is not available!")
 
-ge.between <- cor(exprs(ccle.ge), exprs(cgp.ge), method="spearman", use="pairwise.complete.obs")
+ge.between <- sapply(1:length(cellNames(common$CCLE)), function(x){cor(exprs(ccle.ge)[,x], exprs(cgp.ge)[,x], method="spearman", use="pairwise.complete.obs")})
 auc.between <- cor(ccle.auc, cgp.auc, method="spearman", use="pairwise.complete.obs")
 ic50.between <- cor(ccle.ic50, cgp.ic50, method="spearman", use="pairwise.complete.obs")
 
@@ -352,6 +354,7 @@ if (!file.exists(myfn)) {
 
 myfn <- "ic50_cgp_ccle_amcc_across.RData"
 if (!file.exists(myfn)) {
+  pdf("ic50_cgp_ccle_amcc_across.pdf", height=5, width=9)
   mcc.ic50 <- NULL
   for(drugn in drugNames(common$CGP)) {
     # message(sprintf("compute AMCC for %s", drugn))
@@ -397,24 +400,6 @@ dev.off()
 
 
 
-pdf("cgp_ccle_auc_amcc_vs_mad.pdf", width=10, height=5)
-par(mfrow=c(1, 2), mar=c(5, 4, 1, 2) + 0.1, cex=0.7)
-xxlim <- c(floor(min(drug.amcc, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.amcc, na.rm=TRUE) * 1200) / 1000)
-## variability in cgp
-cc <- cor.test(drug.mad.cgp, drug.amcc, method="spearman", use="complete.obs", alternative="two.sided")
-yylim <- c(floor(min(drug.mad.cgp, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.cgp, na.rm=TRUE) * 1200) / 1000)
-plot(x=drug.amcc, y=drug.mad.cgp, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="AMCC of AUC between CCLE and CGP", ylab="MAD of AUC in CGP")
-text(x=drug.amcc, y=drug.mad.cgp, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
-legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
-## variability in ccle
-nnn <- sum(complete.cases(drug.mad.ccle, drug.amcc))
-cc <- cor.test(drug.mad.ccle, drug.amcc, method="spearman", use="complete.obs", alternative="two.sided")
-yylim <- c(floor(min(drug.mad.ccle, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.ccle, na.rm=TRUE) * 1200) / 1000)
-plot(x=drug.amcc, y=drug.mad.ccle, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="AMCC of AUC between CCLE and CGP", ylab="MAD of AUC in CCLE")
-text(x=drug.amcc, y=drug.mad.ccle, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
-legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
-dev.off()
-
 #################################################
 ## Supplementary Figure 6
 #################################################
@@ -457,7 +442,6 @@ mtext(side=3, at=par("usr")[1] - 0.33, text=LETTERS[2], line=2, font=2, cex=0.8)
 dev.off()
 
 
-
 pdf("cgp_ccle_auc_mad_vs_mad.pdf", width=5, height=5)
 par(mar=c(5, 4, 1, 2) + 0.1, cex=0.7)
 xxlim <- c(floor(min(drug.mad.cgp, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.cgp, na.rm=TRUE) * 1200) / 1000)
@@ -494,4 +478,23 @@ text(x=diag(auc.across), y=drug.mad.ccle, labels=drugNames(common$CGP), cex=0.7,
 legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
 dev.off()
 ## hist(rr)
+pdf("cgp_ccle_auc_amcc_vs_mad.pdf", width=10, height=5)
+par(mfrow=c(1, 2), mar=c(5, 4, 1, 2) + 0.1, cex=0.7)
+xxlim <- c(floor(min(drug.amcc, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.amcc, na.rm=TRUE) * 1200) / 1000)
+## variability in cgp
+cc <- cor.test(drug.mad.cgp, drug.amcc, method="spearman", use="complete.obs", alternative="two.sided")
+yylim <- c(floor(min(drug.mad.cgp, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.cgp, na.rm=TRUE) * 1200) / 1000)
+plot(x=drug.amcc, y=drug.mad.cgp, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="AMCC of AUC between CCLE and CGP", ylab="MAD of AUC in CGP")
+text(x=drug.amcc, y=drug.mad.cgp, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
+legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
+## variability in ccle
+nnn <- sum(complete.cases(drug.mad.ccle, drug.amcc))
+cc <- cor.test(drug.mad.ccle, drug.amcc, method="spearman", use="complete.obs", alternative="two.sided")
+yylim <- c(floor(min(drug.mad.ccle, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.ccle, na.rm=TRUE) * 1200) / 1000)
+plot(x=drug.amcc, y=drug.mad.ccle, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="AMCC of AUC between CCLE and CGP", ylab="MAD of AUC in CCLE")
+text(x=drug.amcc, y=drug.mad.ccle, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
+legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
+dev.off()
+
+
 
