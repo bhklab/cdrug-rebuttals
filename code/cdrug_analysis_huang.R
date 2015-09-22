@@ -417,7 +417,7 @@ levels(iix.cgp) <- c("Cytotoxic", "Targeted")
 iix.ccle <- factor(!is.na(drugInfo(CCLE)[ , "Class"]) & drugInfo(CCLE)[ , "Class"] == "Cytotoxic", levels=c(TRUE, FALSE))
 levels(iix.ccle) <- c("Cytotoxic", "Targeted")
 
-library("pROC")
+require(pROC) || stop("Library Biobase is not available!")
 ## find optimal cutoff to descriminate cytotoxic vs targeted drugs based on AUC MAD
 rroc.cgp <- pROC::roc(formula=drug.type ~ drug.mad, data=data.frame("drug.mad"=drug.mad.cgp.all, "drug.type"=iix.cgp))
 threshold.cgp <- pROC::coords(roc=rroc.cgp, x="best", best.method="youden")[1]
