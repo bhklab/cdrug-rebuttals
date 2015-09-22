@@ -57,6 +57,42 @@ cgp.ge <- cgp.ge[common.features,]
 cgp.auc <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="auc_published", summary.stat="median")
 cgp.ic50 <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="ic50_published", summary.stat="median")
 
+myScatterPlot <- function(x, y, method=c("plain", "transparent", "smooth"), transparency=0.10, smooth.pch=".", pch=16, minp=50, col=blues9[7], smooth.col=c("white", blues9), ...) {
+  require(grDevices) || stop("Library grDevices is not available!")
+  method <- match.arg(method)
+  if (length(col) != length(x)) {
+    col <- rep(col, length.out=length(x))
+  }
+  ccix <- complete.cases(x, y)
+  x <- x[ccix]
+  y <- y[ccix]
+  col <- col[ccix]
+  
+  if (sum(ccix) < minp) {
+    ## too few points, no transparency, no smoothing
+    if (sum(ccix) > 0) { rr <- plot(x=x, y=y, col=col, pch=pch, ...) } else { rr <- plot(x=x, y=y, col=col, pch=pch, ...) }
+  } else {
+    ## enough data points
+    switch(method,
+           "plain"={
+             rr <- plot(x=x, y=y, col=col, pch=pch, ...)
+           },
+           "transparent"={
+             myrgb <- sapply(col, grDevices::col2rgb, alpha=FALSE) / 255
+             myrgb <- apply(myrgb, 2, function (x, transparency) {
+               return (rgb(red=x[1], green=x[2], blue=x[3], alpha=transparency, maxColorValue=1))
+             }, transparency=transparency)
+             rr <- plot(x=x, y=y, pch=pch, col=myrgb, ...)
+           },
+           "smooth"={
+             rr <- smoothScatter(x=x, y=y, col="lightgray", colramp=colorRampPalette(smooth.col), pch=smooth.pch, ...)
+           }
+    )
+  }
+  
+  invisible(rr)
+}
+
 
 #################################################
 ## Supplementary Figure 1
@@ -90,25 +126,24 @@ dev.off()
 
 
 ##correlation between cell lines
+ge.between <- sapply(1:length(cellNames(common$CCLE)), function(x){cor(exprs(ccle.ge)[,x], exprs(cgp.ge)[,x], method="spearman", use="pairwise.complete.obs")})
+
 ge.between <- cor(exprs(ccle.ge), exprs(cgp.ge), method="spearman", use="pairwise.complete.obs")
 auc.between <- cor(ccle.auc, cgp.auc, method="spearman", use="pairwise.complete.obs")
 ic50.between <- cor(ccle.ic50, cgp.ic50, method="spearman", use="pairwise.complete.obs")
 
-save(ge.between, auc.between, ic50.between, file="cor_between.RData")
-w1 <- wilcox.test(x=diag(ge.between), y=diag(auc.between), conf.int=TRUE)
-w2 <- wilcox.test(x=diag(ge.between), y=diag(ic50.between), conf.int=TRUE)
+w1 <- wilcox.test(x=ge.between, y=diag(auc.between), conf.int=TRUE)
+w2 <- wilcox.test(x=ge.between, y=diag(ic50.between), conf.int=TRUE)
 yylim <- c(-1, 1)
 ss <- sprintf("GE vs. AUC = %.1E\nGE vs. IC50 = %.1E", w1$p.value, w2$p.value)
 pdf("cgp_ccle_spearman_between_cellines_boxplot.pdf", height=7, width=7)
-boxplot(list("GE"=diag(ge.between), "AUC"=diag(auc.between), "IC50"=diag(ic50.between)), main="Concordance between cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
+boxplot(list("GE"=ge.between, "AUC"=diag(auc.between), "IC50"=diag(ic50.between)), main="Concordance between cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
 dev.off()
 
 ##correlation across cell lines
 ge.across <- sapply(1:length(common.features), function(x){cor(exprs(ccle.ge)[x,], exprs(cgp.ge)[x,], method="spearman", use="pairwise.complete.obs")})
 auc.across <- cor(t(ccle.auc), t(cgp.auc), method="spearman", use="pairwise.complete.obs")
 ic50.across <- cor(t(ccle.ic50), t(cgp.ic50), method="spearman", use="pairwise.complete.obs")
-
-save(ge.across, auc.across, ic50.across, file="cor_between.RData")
 
 w1 <- wilcox.test(x=ge.across, y=diag(auc.across), conf.int=TRUE)
 w2 <- wilcox.test(x=ge.across, y=diag(ic50.across), conf.int=TRUE)
@@ -460,38 +495,3 @@ legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legen
 dev.off()
 ## hist(rr)
 
-myScatterPlot <- function(x, y, method=c("plain", "transparent", "smooth"), transparency=0.10, smooth.pch=".", pch=16, minp=50, col=blues9[7], smooth.col=c("white", blues9), ...) {
-  require(grDevices) || stop("Library grDevices is not available!")
-  method <- match.arg(method)
-  if (length(col) != length(x)) {
-    col <- rep(col, length.out=length(x))
-  }
-  ccix <- complete.cases(x, y)
-  x <- x[ccix]
-  y <- y[ccix]
-  col <- col[ccix]
-  
-  if (sum(ccix) < minp) {
-    ## too few points, no transparency, no smoothing
-    if (sum(ccix) > 0) { rr <- plot(x=x, y=y, col=col, pch=pch, ...) } else { rr <- plot(x=x, y=y, col=col, pch=pch, ...) }
-  } else {
-    ## enough data points
-    switch(method,
-           "plain"={
-             rr <- plot(x=x, y=y, col=col, pch=pch, ...)
-           },
-           "transparent"={
-             myrgb <- sapply(col, grDevices::col2rgb, alpha=FALSE) / 255
-             myrgb <- apply(myrgb, 2, function (x, transparency) {
-               return (rgb(red=x[1], green=x[2], blue=x[3], alpha=transparency, maxColorValue=1))
-             }, transparency=transparency)
-             rr <- plot(x=x, y=y, pch=pch, col=myrgb, ...)
-           },
-           "smooth"={
-             rr <- smoothScatter(x=x, y=y, col="lightgray", colramp=colorRampPalette(smooth.col), pch=smooth.pch, ...)
-           }
-    )
-  }
-  
-  invisible(rr)
-}
