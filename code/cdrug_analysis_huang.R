@@ -1,7 +1,6 @@
 args <- commandArgs(trailingOnly = TRUE)
 if(length(nbcore) == 0){nbcore <- as.integer(args[1])}
 
-devtools::install_github(username="bhaibeka", repo="PharmacoGx-private", ref="master", auth_token="5db7525017036bea5d4a799c36e2e78822c17836", build_vignettes=FALSE)
 library(PharmacoGx)
 
 myf <- "PSets/CGP_Nature2013.RData"
