@@ -1,12 +1,32 @@
 args <- commandArgs(trailingOnly = TRUE)
 if(length(nbcore) == 0){nbcore <- as.integer(args[1])}
 
-
+devtools::install_github(username="bhaibeka", repo="PharmacoGx-private", ref="master", auth_token="5db7525017036bea5d4a799c36e2e78822c17836", build_vignettes=FALSE)
 library(PharmacoGx)
-CGP <- downloadPSet("CGP_Nature2013") 
-CCLE <- downloadPSet("CCLE_Nature2013") 
 
-common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"))
+myf <- "PSets/CGP_Nature2013.RData"
+if(file.exists(myf)) {
+  load(myf)
+}else{
+  CGP <- downloadPSet("CGP_Nature2013") 
+}
+
+myf <- "PSets/CCLE_Nature2013.RData"
+if(file.exists(myf)) {
+  load(myf)
+}else{
+  CCLE <- downloadPSet("CCLE_Nature2013") 
+}
+nbcore <- 4
+badchars <- "[\xb5]|[]|[ ,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
+nature2013.common.cellines <- read.csv(file=file.path("data", "HaibeKains_Nature_2013_common_cellines.csv"), stringsAsFactors=FALSE)[ , 1]
+confine.analyses.to.nature.common.cell.lines <-FALSE
+
+if(confine.analyses.to.nature.common.cell.lines) {
+  common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"), cells=nature2013.common.cellines)  
+}else{ 
+  common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"))
+}
 #512 cell lines
 #15 drugs
 
@@ -26,12 +46,24 @@ mm <- mm[mm[ , 2] != 0, , drop=FALSE]
 mm <- mm[order(as.numeric(mm[ , 2]), decreasing=TRUE), , drop=FALSE]
 xtable::print.xtable(xtable::xtable(mm), include.rownames=FALSE, floating=FALSE, file="tissue_type.tex", append=FALSE)
 
+common.features <- intersect(rownames(featureInfo(common$CCLE, "rna"))[featureInfo(common$CCLE, "rna")[,"BEST"]==T], rownames(featureInfo(common$CGP, "rna"))[featureInfo(common$CGP, "rna")[,"BEST"]==T])
+
+ccle.ge <- summarizeMolecularProfiles(pSet=common$CCLE, mDataType="rna", summary.stat="median")
+ccle.ge <- ccle.ge[common.features,]
+ccle.auc <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="auc_published", summary.stat="median")
+ccle.ic50 <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="ic50_published", summary.stat="median")
+
+cgp.ge <- summarizeMolecularProfiles(pSet=common$CGP, mDataType="rna", summary.stat="median")
+cgp.ge <- cgp.ge[common.features,]
+cgp.auc <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="auc_published", summary.stat="median")
+cgp.ic50 <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="ic50_published", summary.stat="median")
+
+
 #################################################
 ## Supplementary Figure 1
 #scatter plot with red points for missed cell lines in nature study
 #################################################
 
-nature2013.common.cellines <- read.csv(file=file.path("data", "HaibeKains_Nature_2013_common_cellines.csv"))[ , 1]
 
 pdf("cgp_ccle_scatterplot_auc_missed_red_points.pdf", height=14, width=14)
 par(mfrow=c(4, 4), cex=0.8, las=1)
@@ -57,17 +89,6 @@ dev.off()
 ## Supplementary Figure 2 : box plots, spearman, across vs between
 #################################################
 
-common.features <- intersect(rownames(featureInfo(common$CCLE, "rna"))[featureInfo(common$CCLE, "rna")[,"BEST"]==T], rownames(featureInfo(common$CGP, "rna"))[featureInfo(common$CGP, "rna")[,"BEST"]==T])
-
-ccle.ge <- summarizeMolecularProfiles(pSet=common$CCLE, mDataType="rna", summary.stat="median")
-ccle.ge <- ccle.ge[common.features,]
-ccle.auc <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="auc_published", summary.stat="median")
-ccle.ic50 <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="ic50_published", summary.stat="median")
-
-cgp.ge <- summarizeMolecularProfiles(pSet=common$CGP, mDataType="rna", summary.stat="median")
-cgp.ge <- cgp.ge[common.features,]
-cgp.auc <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="auc_published", summary.stat="median")
-cgp.ic50 <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="ic50_published", summary.stat="median")
 
 ##correlation between cell lines
 ge.between <- cor(exprs(ccle.ge), exprs(cgp.ge), method="spearman", use="pairwise.complete.obs")
@@ -188,14 +209,25 @@ cgp.camptothecin.mgh <- ic50[ , "drugid_1003", drop=FALSE]
 
 drugn <- "CAMPTOTHECIN"
 # message(sprintf("compute AMCC for %s", drugn))
-xx <- -log10(cgp.camptothecin.wtsi)
-yy <- -log10(cgp.camptothecin.mgh)
+xx <- -log10(cgp.camptothecin.wtsi * 10^6)
+yy <- -log10(cgp.camptothecin.mgh * 10^6)
 ccix <- complete.cases(xx, yy)
+# pdf("campthotecin.pdf", height=5, width=5)
+# ll <- min(xx[ccix],yy[ccix], na.rm=T)
+# rr<- max(xx[ccix],yy[ccix], na.rm=T)
+# myScatterPlot(xx, yy, main=drugn, xlab="-Log10 IC50 (WTSI)", ylab="-Log10 IC50 (MGH)", ylim=c(ll,rr), xlim=c(ll,rr))
+# abline(0, 1, col="gray", lty=1, lwd=0.5 )
+# rs <- cor.test(x=xx, y=yy, method="pearson", use="pairwise.complete.obs")
+# legend("topleft", legend=c(sprintf("R=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+# dev.off()
+
 mm <- amcc(x=xx, y=yy, min.cat=min.cat, nperm=10^3, nthread=nbcore)
 mcc.auc <- mm$amcc
 mm <- mm$mcc
 rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 2):nrow(mm))
 mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+
+
 pdf("auc_cgp_campthotecin_amcc_across.pdf", height=5, width=9)
 par(mfrow=c(1, 2))
 ## scatterplot with sperman correlation
@@ -221,15 +253,28 @@ tt <- cbind(CGP@sensitivity$info, "drugid2"=sapply(strsplit(rownames(CGP@sensiti
 cells <- intersect(tt[grep(ids[1], rownames(tt)),"cellid"], tt[grep(ids[2], rownames(tt)),"cellid"])
 id1 <- rownames(tt)[which(tt$drugid2 == ids[1] & tt$cellid %in% cells)]
 id2 <- rownames(tt)[which(tt$drugid2 == ids[2] & tt$cellid %in% cells)]
-# message(sprintf("compute AMCC for %s", drugn))
+message(sprintf("compute AMCC for %s", drugn))
 xx <- -log10(CGP@sensitivity$profiles[id1, "ic50_published"])
 yy <- -log10(CGP@sensitivity$profiles[id2, "ic50_published"])
 ccix <- complete.cases(xx, yy)
+# pdf("AZD6482.pdf", height=5, width=5)
+# ll <- min(xx[ccix],yy[ccix], na.rm=T)
+# rr<- max(xx[ccix],yy[ccix], na.rm=T)
+# myScatterPlot(xx, yy, main=drugn, xlab="-Log10 IC50 (WTSI)", ylab="-Log10 IC50 (MGH)", ylim=c(ll,rr), xlim=c(ll,rr))
+# abline(0, 1, col="gray", lty=1, lwd=0.5 )
+# rs <- cor.test(x=xx, y=yy, method="pearson", use="pairwise.complete.obs")
+# legend("topleft", legend=c(sprintf("R=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+# dev.off()
+
 mm <- amcc(x=xx, y=yy, min.cat=min.cat, nperm=10^3, nthread=nbcore)
 mcc.auc <- mm$amcc
 mm <- mm$mcc
 rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 2):nrow(mm))
 mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+
+
+
+
 pdf("auc_cgp_AZD6482_amcc_across.pdf", height=5, width=9)
 par(mfrow=c(1, 2))
 ## scatterplot with sperman correlation
