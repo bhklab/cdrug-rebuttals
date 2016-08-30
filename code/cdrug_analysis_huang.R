@@ -2,7 +2,7 @@
 # if(length(nbcore) == 0){ nbcore <- as.integer(args[1]) }
 
 ## load functions
-source(file.path("code", "foo.R"))
+source(file.path("code", "cdrug_foo.R"))
 
 saveres <- file.path("output")
 
@@ -21,24 +21,64 @@ library(genefu)
 # devtools::install_github("bhklab/PharmacoGx", ref="master", lib="/mnt/work1/users/bhklab/Rlib/")
 library(PharmacoGx)
 
-### download curated pharmacogenomic data from CGP and CCLE
-CGP <- PharmacoGx::downloadPSet("GDSC_2013", saveDir=file.path(saveres, "PSets")) 
-CCLE <- PharmacoGx::downloadPSet("CCLE_2013", saveDir=file.path(saveres, "PSets")) 
+### cell lines used in Haibe-Kains et al, Nature 2013
+nature2013.common.cellines <- read.csv(file=file.path("data", "HaibeKains_Nature_2013_common_cellines.csv"), stringsAsFactors=FALSE)[ , 1]
+
+### llist of known targets and biomarkers
+known.biomarkers <- read.csv(file.path("data", "known_biomarkers.csv"), stringsAsFactors=FALSE)
+
+### global parameters
 
 nbcore <- 4
+
 badchars <- "[\xb5]|[]|[ ,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
-nature2013.common.cellines <- read.csv(file=file.path("data", "HaibeKains_Nature_2013_common_cellines.csv"), stringsAsFactors=FALSE)[ , 1]
+
 confine.analyses.to.nature.common.cell.lines <- FALSE
 
-if(confine.analyses.to.nature.common.cell.lines) {
-  common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"), cells=nature2013.common.cellines)  
-} else { 
-  common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"))
+cor.method <- "pearson"
+
+
+#################################################
+## get pharmacogenomic datasets
+#################################################
+
+
+myfn <- file.path(saveres, "data_cgp_ccle.RData")
+if (!file.exists(myfn)) {
+  ### download curated pharmacogenomic data from CGP and CCLE
+  CGP <- PharmacoGx::downloadPSet("GDSC_2013", saveDir=file.path(saveres, "PSets")) 
+  CCLE <- PharmacoGx::downloadPSet("CCLE_2013", saveDir=file.path(saveres, "PSets")) 
+  if(confine.analyses.to.nature.common.cell.lines) {
+    common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"), cells=nature2013.common.cellines)  
+  } else { 
+    common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"))
+  }
+  ### 512 cell lines and 15 drugs in comon
+
+  ### reorder drugs to put nioltinib first
+  drugix <- rownames(common$CGP@drug)
+  drugix <- c(which(drugix == "Nilotinib"), setdiff(1:length(drugix), which(drugix == "Nilotinib")))
+
+  ### common affymetrix probes
+  common.features <- intersect(rownames(featureInfo(common$CCLE, "rna"))[featureInfo(common$CCLE, "rna")[,"BEST"]==T], rownames(featureInfo(common$CGP, "rna"))[featureInfo(common$CGP, "rna")[,"BEST"]==T])
+  ### CGP
+  cgp.ge <- summarizeMolecularProfiles(pSet=common$CGP, mDataType="rna", summary.stat="median")
+  cgp.ge <- cgp.ge[common.features,]
+  cgp.auc <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="auc_published", summary.stat="median")[drugix, , drop=FALSE]
+  cgp.ic50 <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="ic50_published", summary.stat="median")[drugix, , drop=FALSE]
+  ### CCLE
+  ccle.ge <- summarizeMolecularProfiles(pSet=common$CCLE, mDataType="rna", summary.stat="median")
+  ccle.ge <- ccle.ge[common.features,]
+  ccle.auc <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="auc_published", summary.stat="median")[drugix, , drop=FALSE]
+  ccle.ic50 <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="ic50_published", summary.stat="median")[drugix, , drop=FALSE]
+  ### note that ic50 and auc recomputed using a unified pipeline could be selected by using ic50_recomputed or auc_recomputed
+
+  save(list=c("CGP", "CCLE", "common", "common.features", "cgp.ge", "cgp.auc", "cgp.ic50", "ccle.ge", "ccle.auc", "ccle.ic50"), compress=TRUE, file=myfn)
+} else {
+  load(myfn)
 }
-## 512 cell lines and 15 drugs in comon
 
 mycol <- RColorBrewer::brewer.pal(n=7, name="Set1")
-
 ### venn diagram of common cell lines between studies
 pdf(file.path(saveres, "celllines.pdf"), height=4, width=4)
 venn.plot <- VennDiagram::draw.pairwise.venn(area1=nrow(CCLE@cell), area2=nrow(CGP@cell), cross.area=nrow(common$CCLE@cell), fill=c(mycol[1], mycol[2]), lty="blank",cex=1.5, cat.cex=1, cat.col = c("black", "black"))
@@ -54,21 +94,6 @@ mm <- cbind("Tissue type"= Hmisc::capitalize(gsub("_", " ", names(tt))), "Number
 mm <- mm[mm[ , 2] != 0, , drop=FALSE]
 mm <- mm[order(as.numeric(mm[ , 2]), decreasing=TRUE), , drop=FALSE]
 xtable::print.xtable(xtable::xtable(mm), include.rownames=FALSE, floating=FALSE, file=file.path(saveres, "tissue_type.tex"), append=FALSE)
-
-### common affymetrix probes
-common.features <- intersect(rownames(featureInfo(common$CCLE, "rna"))[featureInfo(common$CCLE, "rna")[,"BEST"]==T], rownames(featureInfo(common$CGP, "rna"))[featureInfo(common$CGP, "rna")[,"BEST"]==T])
-### CGP
-cgp.ge <- summarizeMolecularProfiles(pSet=common$CGP, mDataType="rna", summary.stat="median")
-cgp.ge <- cgp.ge[common.features,]
-cgp.auc <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="auc_published", summary.stat="median")
-cgp.ic50 <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="ic50_published", summary.stat="median")
-### CCLE
-ccle.ge <- summarizeMolecularProfiles(pSet=common$CCLE, mDataType="rna", summary.stat="median")
-ccle.ge <- ccle.ge[common.features,]
-ccle.auc <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="auc_published", summary.stat="median")
-ccle.ic50 <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="ic50_published", summary.stat="median")
-### note that ic50 and auc recomputed using a unified pipeline could be selected by using ic50_recomputed or auc_recomputed
-
 
 #################################################
 ### Supplementary Figure 1
@@ -96,11 +121,12 @@ dev.off()
 
 
 #################################################
-## Supplementary Figure 2 : box plots, spearman, across vs between
+## Supplementary Figure 2 : box plots, correlation, across vs between
 #################################################
 
 ### correlation between cell lines
-ge.between <- sapply(1:length(cellNames(common$CCLE)), function(x){cor(exprs(ccle.ge)[,x], exprs(cgp.ge)[,x], method="spearman", use="pairwise.complete.obs")})
+### spearman
+ge.between <- sapply(1:length(cellNames(common$CCLE)), function(x){ cor(exprs(ccle.ge)[,x], exprs(cgp.ge)[,x], method="spearman", use="pairwise.complete.obs") })
 auc.between <- cor(ccle.auc, cgp.auc, method="spearman", use="pairwise.complete.obs")
 ic50.between <- cor(ccle.ic50, cgp.ic50, method="spearman", use="pairwise.complete.obs")
 w1 <- wilcox.test(x=ge.between, y=diag(auc.between), conf.int=TRUE)
@@ -108,11 +134,23 @@ w2 <- wilcox.test(x=ge.between, y=diag(ic50.between), conf.int=TRUE)
 yylim <- c(-1, 1)
 ss <- sprintf("GE vs. AUC = %.1E\nGE vs. IC50 = %.1E", w1$p.value, w2$p.value)
 pdf(file.path(saveres, "cgp_ccle_spearman_between_cellines_boxplot.pdf"), height=7, width=7)
-boxplot(list("GE"=ge.between, "AUC"=diag(auc.between), "IC50"=diag(ic50.between)), main="Concordance between cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
+boxplot(list("GE"=ge.between, "AUC"=diag(auc.between), "IC50"=diag(ic50.between)), main="Concordance between cell lines\nSpearman", ylab=expression(rho), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
+dev.off()
+### pearson
+ge.between <- sapply(1:length(cellNames(common$CCLE)), function(x){ cor(exprs(ccle.ge)[,x], exprs(cgp.ge)[,x], method="pearson", use="pairwise.complete.obs") })
+auc.between <- cor(ccle.auc, cgp.auc, method="pearson", use="pairwise.complete.obs")
+ic50.between <- cor(ccle.ic50, cgp.ic50, method="pearson", use="pairwise.complete.obs")
+w1 <- wilcox.test(x=ge.between, y=diag(auc.between), conf.int=TRUE)
+w2 <- wilcox.test(x=ge.between, y=diag(ic50.between), conf.int=TRUE)
+yylim <- c(-1, 1)
+ss <- sprintf("GE vs. AUC = %.1E\nGE vs. IC50 = %.1E", w1$p.value, w2$p.value)
+pdf(file.path(saveres, "cgp_ccle_pearson_between_cellines_boxplot.pdf"), height=7, width=7)
+boxplot(list("GE"=ge.between, "AUC"=diag(auc.between), "IC50"=diag(ic50.between)), main="Concordance between cell lines\nPearson", ylab=expression(rho), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
 dev.off()
 
 ### correlation across cell lines
-ge.across <- sapply(1:length(common.features), function(x){cor(exprs(ccle.ge)[x,], exprs(cgp.ge)[x,], method="spearman", use="pairwise.complete.obs")})
+### spearman
+ge.across <- sapply(1:length(common.features), function(x){ cor(exprs(ccle.ge)[x,], exprs(cgp.ge)[x,], method="spearman", use="pairwise.complete.obs") })
 auc.across <- cor(t(ccle.auc), t(cgp.auc), method="spearman", use="pairwise.complete.obs")
 ic50.across <- cor(t(ccle.ic50), t(cgp.ic50), method="spearman", use="pairwise.complete.obs")
 w1 <- wilcox.test(x=ge.across, y=diag(auc.across), conf.int=TRUE)
@@ -120,7 +158,18 @@ w2 <- wilcox.test(x=ge.across, y=diag(ic50.across), conf.int=TRUE)
 yylim <- c(-1, 1)
 ss <- sprintf("GE vs. AUC = %.1E\nGE vs. IC50 = %.1E", w1$p.value, w2$p.value)
 pdf(file.path(saveres, "cgp_ccle_spearman_across_cellines_boxplot.pdf"), height=7, width=7)
-boxplot(list("GE"=ge.across, "AUC"=diag(auc.across), "IC50"=diag(ic50.across)), main="Concordance across cell lines", ylab=expression(R[s]), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
+boxplot(list("GE"=ge.across, "AUC"=diag(auc.across), "IC50"=diag(ic50.across)), main="Concordance across cell lines\nSpearman", ylab=expression(rho), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
+dev.off()
+### pearson
+ge.across <- sapply(1:length(common.features), function(x){ cor(exprs(ccle.ge)[x,], exprs(cgp.ge)[x,], method="pearson", use="pairwise.complete.obs") })
+auc.across <- cor(t(ccle.auc), t(cgp.auc), method="pearson", use="pairwise.complete.obs")
+ic50.across <- cor(t(ccle.ic50), t(cgp.ic50), method="pearson", use="pairwise.complete.obs")
+w1 <- wilcox.test(x=ge.across, y=diag(auc.across), conf.int=TRUE)
+w2 <- wilcox.test(x=ge.across, y=diag(ic50.across), conf.int=TRUE)
+yylim <- c(-1, 1)
+ss <- sprintf("GE vs. AUC = %.1E\nGE vs. IC50 = %.1E", w1$p.value, w2$p.value)
+pdf(file.path(saveres, "cgp_ccle_pearson_across_cellines_boxplot.pdf"), height=7, width=7)
+boxplot(list("GE"=ge.across, "AUC"=diag(auc.across), "IC50"=diag(ic50.across)), main="Concordance across cell lines\nPearson", ylab=expression(rho), sub=ss, ylim=yylim, col="lightgrey", pch=20, border="black")
 dev.off()
 
 #################################################
@@ -145,12 +194,12 @@ if (!file.exists(myfn)) {
     par(mfrow=c(1, 2))
     ## scatterplot with sperman correlation
     myScatterPlot(xx, yy, main=drugn, xlab="AUC (CGP)", ylab="AUC (CCLE)")
-    rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs")
+    rs <- cor.test(x=xx, y=yy, method=cor.method, use="pairwise.complete.obs")
     oo <- sort(xx[ccix], decreasing=TRUE)
     abline(v=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
     oo <- sort(yy[ccix], decreasing=TRUE)
     abline(h=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
-    legend("topleft", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+    legend("topleft", legend=c(sprintf("rho=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
     ## mcc plot
     plot(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], ylim=c(min(mm[-rmix, "estimate"]), 1), xlab="# sensitive cell lines", ylab="Matthews Correlation coefficient", pch=20, col="lightgrey", main="")
     lines(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], col="darkgrey")
@@ -160,7 +209,9 @@ if (!file.exists(myfn)) {
   rownames(mcc.auc) <- drugNames(common$CGP)
   dev.off()
   save(list=c("mcc.auc"), compress=TRUE, file=myfn)
-} else { load(myfn) }
+} else {
+  load(myfn)
+}
 drug.amcc <- mcc.auc[, "mcc"]
 
 #################################################
@@ -220,12 +271,12 @@ pdf(file.path(saveres, "auc_cgp_campthotecin_amcc_across.pdf"), height=5, width=
 par(mfrow=c(1, 2))
 ## scatterplot with sperman correlation
 myScatterPlot(xx, yy, main=drugn, xlab="-Log10 IC50 (WTSI)", ylab="-Log10 IC50 (MGH)")
-rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs", exact=FALSE)
+rs <- cor.test(x=xx, y=yy, method=cor.method, use="pairwise.complete.obs", exact=FALSE)
 oo <- sort(xx[ccix], decreasing=TRUE)
 abline(v=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
 oo <- sort(yy[ccix], decreasing=TRUE)
 abline(h=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
-legend("topleft", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+legend("topleft", legend=c(sprintf("rho=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
 ## mcc plot
 plot(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], ylim=c(min(mm[-rmix, "estimate"]), 1), xlab="# sensitive cell lines", ylab="Matthews Correlation coefficient", pch=20, col="lightgrey", main="")
 lines(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], col="darkgrey")
@@ -254,12 +305,12 @@ pdf(file.path(saveres, "auc_cgp_AZD6482_amcc_across.pdf"), height=5, width=9)
 par(mfrow=c(1, 2))
 ## scatterplot with sperman correlation
 myScatterPlot(xx, yy, main=drugn, xlab="-Log10 IC50 (WTSI)", ylab="-Log10 IC50 (MGH)")
-rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs", exact=FALSE)
+rs <- cor.test(x=xx, y=yy, method=cor.method, use="pairwise.complete.obs", exact=FALSE)
 oo <- sort(xx[ccix], decreasing=TRUE)
 abline(v=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
 oo <- sort(yy[ccix], decreasing=TRUE)
 abline(h=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
-legend("topleft", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+legend("topleft", legend=c(sprintf("rho=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
 ## mcc plot
 plot(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], ylim=c(min(mm[-rmix, "estimate"]), 1), xlab="# sensitive cell lines", ylab="Matthews Correlation coefficient", pch=20, col="lightgrey", main="")
 lines(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], col="darkgrey")
@@ -305,21 +356,21 @@ if (!file.exists(myfn)) {
     mcc.ic50 <- rbind(mcc.ic50, mm$amcc)
     mm <- mm$mcc
     rmix <- c(1:(min.cat - 1), (nrow(mm) - min.cat + 2):nrow(mm))
-    mccix <- max(which(mm[-rmix, "mcc"] == max(mm[-rmix, "mcc"], na.rm=TRUE))) + (min.cat - 1)
+    mccix <- max(which(mm[-rmix, "estimate"] == max(mm[-rmix, "estimate"], na.rm=TRUE))) + (min.cat - 1)
     par(mfrow=c(1, 2))
     ## scatterplot with sperman correlation
     myScatterPlot(xx, yy, main=drugn, xlab="AUC (CGP)", ylab="AUC (CCLE)")
-    rs <- cor.test(x=xx, y=yy, method="spearman", use="pairwise.complete.obs")
+    rs <- cor.test(x=xx, y=yy, method=cor.method, use="pairwise.complete.obs")
     oo <- sort(xx[ccix], decreasing=TRUE)
     abline(v=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
     oo <- sort(yy[ccix], decreasing=TRUE)
     abline(h=(oo[mccix] + oo[mccix + 1]) / 2, col="red", lty=2)
-    legend("topleft", legend=c(sprintf("Rs=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
+    legend("topleft", legend=c(sprintf("rho=%.2g, p=%.1E", rs$estimate, rs$p.value), sprintf("# cell lines=%i", sum(ccix))), col="white", pch=0, bty="n")
     ## mcc plot
-    plot(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "mcc"], ylim=c(min(mm[-rmix, "mcc"]), 1), xlab="# sensitive cell lines", ylab="Matthews Correlation coefficient", pch=20, col="lightgrey", main="")
-    lines(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "mcc"], col="darkgrey")
-    abline(v=(1:nrow(mm[-rmix, ]))[which.max(mm[-rmix, "mcc"])], col="red", lty=2)
-    legend("topright", legend=c(sprintf("AMCC=%.2g, p=%.1E", mm[mccix, "mcc"], mm[mccix, "p"]), sprintf("# sensitive cell lines=%i", mccix)), col="white", pch=0, bty="n", text.font=1)
+    plot(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], ylim=c(min(mm[-rmix, "estimate"]), 1), xlab="# sensitive cell lines", ylab="Matthews Correlation coefficient", pch=20, col="lightgrey", main="")
+    lines(x=1:nrow(mm[-rmix, ]), y=mm[-rmix, "estimate"], col="darkgrey")
+    abline(v=(1:nrow(mm[-rmix, ]))[which.max(mm[-rmix, "estimate"])], col="red", lty=2)
+    legend("topright", legend=c(sprintf("AMCC=%.2g, p=%.1E", mm[mccix, "estimate"], mm[mccix, "p.value"]), sprintf("# sensitive cell lines=%i", mccix)), col="white", pch=0, bty="n", text.font=1)
   }
   rownames(mcc.ic50) <- drugNames(common$CGP)
   dev.off()
@@ -346,8 +397,13 @@ dev.off()
 cgp.auc.all <- summarizeSensitivityProfiles(pSet=CGP, sensitivity.measure="auc_published", summary.stat="median")
 ccle.auc.all <- summarizeSensitivityProfiles(pSet=CCLE, sensitivity.measure="auc_published", summary.stat="median")
 
+### median abslute deviation of drug sensitivities
+### all data
 drug.mad.cgp.all <- apply(cgp.auc.all, 1, mad, na.rm=TRUE)
 drug.mad.ccle.all <- apply(ccle.auc.all, 1, mad, na.rm=TRUE)
+### common data
+drug.mad.cgp <- apply(cgp.auc, 1, mad, na.rm=TRUE)
+drug.mad.ccle <- apply(ccle.auc, 1, mad, na.rm=TRUE)
 
 ## MAD of cytotoxic drugs vs the rest in full studies
 iix.cgp <- factor(!is.na(drugInfo(CGP)[ , "Drug.class.II"]) & drugInfo(CGP)[ , "Drug.class.II"] == "Cytotoxic", levels=c(TRUE, FALSE))
@@ -398,37 +454,76 @@ pdf(file.path(saveres, "cgp_ccle_auc_cor_vs_mad.pdf"), width=10, height=5)
 par(mfrow=c(1, 2), mar=c(5, 4, 1, 2) + 0.1, cex=0.7)
 xxlim <- c(floor(min(diag(auc.across), na.rm=TRUE) * 1000) / 1000, ceiling(max(diag(auc.across), na.rm=TRUE) * 1200) / 1000)
 ## variability in cgp
-cc <- cor.test(drug.mad.cgp, diag(auc.across), method="spearman", use="complete.obs", alternative="two.sided")
+cc <- cor.test(drug.mad.cgp, diag(auc.across), method=cor.method, use="complete.obs", alternative="two.sided")
 yylim <- c(floor(min(drug.mad.cgp, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.cgp, na.rm=TRUE) * 1200) / 1000)
 plot(x=diag(auc.across), y=drug.mad.cgp, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="Correlation of AUC between CCLE and CGP", ylab="MAD of AUC in CGP")
 text(x=diag(auc.across), y=drug.mad.cgp, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
-legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
+legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("rho=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
 ## variability in ccle
 nnn <- sum(complete.cases(drug.mad.ccle, diag(auc.across)))
-cc <- cor.test(drug.mad.ccle, diag(auc.across), method="spearman", use="complete.obs", alternative="two.sided")
+cc <- cor.test(drug.mad.ccle, diag(auc.across), method=cor.method, use="complete.obs", alternative="two.sided")
 yylim <- c(floor(min(drug.mad.ccle, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.ccle, na.rm=TRUE) * 1200) / 1000)
 plot(x=diag(auc.across), y=drug.mad.ccle, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="Correlation of AUC between CCLE and CGP", ylab="MAD of AUC in CCLE")
 text(x=diag(auc.across), y=drug.mad.ccle, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
-legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
+legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("rho=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
 dev.off()
 
 pdf(file.path(saveres, "cgp_ccle_auc_amcc_vs_mad.pdf"), width=10, height=5)
 par(mfrow=c(1, 2), mar=c(5, 4, 1, 2) + 0.1, cex=0.7)
 xxlim <- c(floor(min(drug.amcc, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.amcc, na.rm=TRUE) * 1200) / 1000)
 ## variability in cgp
-cc <- cor.test(drug.mad.cgp, drug.amcc, method="spearman", use="complete.obs", alternative="two.sided")
+cc <- cor.test(drug.mad.cgp, drug.amcc, method=cor.method, use="complete.obs", alternative="two.sided")
 yylim <- c(floor(min(drug.mad.cgp, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.cgp, na.rm=TRUE) * 1200) / 1000)
 plot(x=drug.amcc, y=drug.mad.cgp, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="AMCC of AUC between CCLE and CGP", ylab="MAD of AUC in CGP")
 text(x=drug.amcc, y=drug.mad.cgp, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
-legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
+legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("rho=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
 ## variability in ccle
 nnn <- sum(complete.cases(drug.mad.ccle, drug.amcc))
-cc <- cor.test(drug.mad.ccle, drug.amcc, method="spearman", use="complete.obs", alternative="two.sided")
+cc <- cor.test(drug.mad.ccle, drug.amcc, method=cor.method, use="complete.obs", alternative="two.sided")
 yylim <- c(floor(min(drug.mad.ccle, na.rm=TRUE) * 1000) / 1000, ceiling(max(drug.mad.ccle, na.rm=TRUE) * 1200) / 1000)
 plot(x=drug.amcc, y=drug.mad.ccle, xlim=xxlim, ylim=yylim, pch=20, col=blues9[7], xlab="AMCC of AUC between CCLE and CGP", ylab="MAD of AUC in CCLE")
 text(x=drug.amcc, y=drug.mad.ccle, labels=drugNames(common$CGP), cex=0.7, font=1, srt=30, pos=4)
-legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("Rs=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
+legend(x=par("usr")[1], y=par("usr")[4], xjust=0.075, yjust=0.85, bty="n", legend=sprintf("rho=%.3g, p=%.1E", cc$estimate, cc$p.value), text.font=1, cex=1)
 dev.off()
 
+
+#################################################
+### known biomarkers
+#################################################
+
+celline.bcrabl <- c("K-562", "KYO-1", "EM-3", "AR230", "KCL22", "BV-173", "CML-T1", "EM-2", "KU812", "LAMA-84", "MEG-01")
+### update CGP PSet
+myfn <- file.path(saveres, "gdsc2013_mutation.csv")
+if (!file.exists(myfn)) {
+  dwl.status <- download.file(url="ftp://ftp.sanger.ac.uk/pub4/cancerrxgene/releases/release-2.0/gdsc_mutation_w2.csv", destfile=myfn, quiet=TRUE)
+}
+fusion.cgp <- read.csv(myfn, stringsAsFactors=FALSE)
+rownames(fusion.cgp) <- rownames(cellInfo(CGP))[match(fusion.cgp[ , "Cell.Line"], cellInfo(CGP)[ , "GDSC.cellid"])]
+fusion.cgp[!is.na(fusion.cgp) & (fusion.cgp == "" | fusion.cgp == " " | fusion.cgp == "na")] <- NA
+fusion.cgp <- t(fusion.cgp[ , c("BCR_ABL", "EWS_FLI1", "MLL_AFF1")])
+mypdata <- data.frame(cbind("batchid"=NA, "cellid"=colnames(fusion.cgp)), stringsAsFactors=FALSE)
+rownames(mypdata) <- colnames(fusion.cgp)
+myfdata <- data.frame("Symbol"=rownames(fusion.cgp), stringsAsFactors=FALSE)
+rownames(myfdata) <- rownames(fusion.cgp)
+CGP@molecularProfiles$fusion <- ExpressionSet(assayData=fusion.cgp, phenoData=AnnotatedDataFrame(mypdata), featureData=AnnotatedDataFrame(myfdata))
+CGP@molecularProfiles$mutation <- CGP@molecularProfiles$mutation[!is.element(rownames(fData(CGP@molecularProfiles$mutation)), c("BCR_ABL", "EWS_FLI1", "MLL_AFF1")), ]
+exprs(CGP@molecularProfiles$fusion)["BCR_ABL", colnames(exprs(CGP@molecularProfiles$fusion)) %in% celline.bcrabl] <- "BCR Exon_13 to ABL Exon_2"
+### update CCLE PSet
+colnames(fData(CCLE@molecularProfiles$rna))[colnames(fData(CCLE@molecularProfiles$rna)) == "symbol"] <- "Symbol"
+fusion.ccle <- CCLE@molecularProfiles$mutation
+exprs(fusion.ccle) <- matrix(NA, nrow=1, ncol=ncol(exprs(fusion.ccle)), dimnames=list("BCR_ABL", colnames(exprs(fusion.ccle))))
+exprs(fusion.ccle)["BCR_ABL", colnames(exprs(fusion.ccle)) %in% celline.bcrabl] <- "BCR Exon_13 to ABL Exon_2"
+myfdata <- data.frame("Symbol"=rownames(fusion.ccle), stringsAsFactors=FALSE)
+rownames(myfdata) <- rownames(fusion.ccle)
+fData(fusion.ccle) <- myfdata
+CCLE@molecularProfiles$fusion <- fusion.ccle
+
+# gene.cgp <- list("rna"=fData(CGP@molecularProfiles$rna)[ , "Symbol"], "mutation"=fData(CGP@molecularProfiles$mutation)[ , "Symbol"], "fusion"=rownames(fData(CGP@molecularProfiles$fusion)))
+# known.biomarkers[!is.element(known.biomarkers[ , "gene"], sort(unique(unlist(gene.cgp)))), ]
+# gene.ccle <- list("rna"=fData(CCLE@molecularProfiles$rna)[ , "Symbol"], "mutation"=fData(CCLE@molecularProfiles$mutation)[ , "Symbol"], "fusion"=fData(CCLE@molecularProfiles$fusion)[ , "Symbol"])
+# known.biomarkers[!is.element(known.biomarkers[ , "gene"], sort(unique(unlist(gene.ccle)))), ]
+
+### for each known biomarker, estimate gene-drug association for mutation, fusion and expression
+mut.biomarkers <- drugSensitivitySig(pSet=CGP, mDataType="mutation", drugs=known.biomarkers[, "drug"], features=known.biomarkers[ , "gene"], sensitivity.measure="auc_published", molecular.summary.stat="or")
 
 
