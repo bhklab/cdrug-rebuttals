@@ -667,5 +667,9 @@ rr <- xx[nilotinib, ]
 xx <- xx[-nilotinib, ]
 xx <- rbind(rr, xx)
 xx <- as.data.frame(xx, stringsAsFactors=FALSE)
-
+#xx[is.na(xx)] <- 0
+xx[,"CGP effect size"] <- as.numeric(xx[,"CGP effect size"])
+xx[,"CCLE effect size"] <- as.numeric(xx[,"CCLE effect size"])
+xx[,"CGP pvalue"] <- as.numeric(xx[,"CGP pvalue"])
+xx[,"CCLE pvalue"] <- as.numeric(xx[,"CCLE pvalue"])
 xtable::print.xtable(xtable::xtable(xx, digits=c(0, 0, 0, 0, 2, -1, 2, -1, 0)), include.rownames=FALSE, floating=FALSE, table.placement="!h", file=file.path(saveres, "known_biomarkers.tex"), append=FALSE)
