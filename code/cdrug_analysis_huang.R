@@ -625,29 +625,47 @@ for(i in 1:nrow(ccle.known.biomarkers)) {
 }
 
 cutoff <- 0.05
+xx <- NULL
 for(i in 1:nrow(ccle.known.biomarkers)) {
   ccle.min <- names(which.min(ccle.known.biomarkers[i, grep("pvalue", colnames(ccle.known.biomarkers))]))
   cgp.min <- names(which.min(cgp.known.biomarkers[i, grep("pvalue", colnames(cgp.known.biomarkers))]))
   if(ccle.min == cgp.min) {
-    known.biomarkers[i, "Type"] <- gsub(".pvalue", "", ccle.min)
-    known.biomarkers[i, "CGP effect size"] <- cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)]
-    known.biomarkers[i, "CGP pvalue"] <- cgp.known.biomarkers[i, ccle.min]
-    known.biomarkers[i, "CCLE effect size"] <- ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)]
-    known.biomarkers[i, "CCLE pvalue"] <- ccle.known.biomarkers[i, ccle.min]
-    if(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff)
-    {
-      known.biomarkers[i, "Reproducible"] <- "YES"
-    } else{
-      known.biomarkers[i, "Reproducible"] <- "NO"
-    }
+    rr <- c(known.biomarkers[i, "drug"],
+            known.biomarkers[i, "gene"],
+            gsub(".pvalue", "", ccle.min),
+            cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            cgp.known.biomarkers[i, ccle.min],
+            ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            ccle.known.biomarkers[i, ccle.min], 
+            ifelse(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff, "YES", "NO"))
+    xx <- rbind(xx, rr)
   } else{
-    known.biomarkers[i, "Type"] <- paste(gsub(".pvalue", "", cgp.min), gsub(".pvalue", "", ccle.min), sep="/")
-    known.biomarkers[i, "CGP effect size"] <- cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", cgp.min)]
-    known.biomarkers[i, "CGP pvalue"] <- cgp.known.biomarkers[i, cgp.min]
-    known.biomarkers[i, "CCLE effect size"] <- ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)]
-    known.biomarkers[i, "CCLE pvalue"] <- ccle.known.biomarkers[i, ccle.min]
-    known.biomarkers[i, "Reproducible"] <- "NO"
+    rr <- c(known.biomarkers[i, "drug"],
+            known.biomarkers[i, "gene"],
+            gsub(".pvalue", "", cgp.min),
+            cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", cgp.min)],
+            cgp.known.biomarkers[i, cgp.min],
+            ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", cgp.min)],
+            ccle.known.biomarkers[i, cgp.min], 
+            ifelse(ccle.known.biomarkers[i, cgp.min] < cutoff & cgp.known.biomarkers[i, cgp.min] < cutoff, "YES", "NO"))
+    xx <- rbind(xx, rr)
+    rr <- c(known.biomarkers[i, "drug"],
+            known.biomarkers[i, "gene"],
+            gsub(".pvalue", "", ccle.min),
+            cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            cgp.known.biomarkers[i, ccle.min],
+            ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            ccle.known.biomarkers[i, ccle.min], 
+            ifelse(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff, "YES", "NO"))
+    xx <- rbind(xx, rr)
   }
 }
+colnames(xx) <- c("Drug", "Gene", "Type", "CGP effect size", "CGP pvalue", "CCLE effect size", "CCLE pvalue", "Reproducibility")
+rownames(xx) <- 1:nrow(xx)
+nilotinib <- which(xx[,"Drug"] == "Nilotinib")
+rr <- xx[nilotinib, ]
+xx <- xx[-nilotinib, ]
+xx <- rbind(rr, xx)
+xx <- as.data.frame(xx, stringsAsFactors=FALSE)
 
-xtable::print.xtable(xtable::xtable(known.biomarkers, digits=c(0, 0, 0, 0, 2, -1, 2, -1, 0)), include.rownames=FALSE, floating=FALSE, table.placement="!h", file=file.path(saveres, "known_biomarkers.tex"), append=FALSE)
+xtable::print.xtable(xtable::xtable(xx, digits=c(0, 0, 0, 0, 2, -1, 2, -1, 0)), include.rownames=FALSE, floating=FALSE, table.placement="!h", file=file.path(saveres, "known_biomarkers.tex"), append=FALSE)
