@@ -655,3 +655,8 @@ xx[,"CGP pvalue"] <- as.numeric(xx[,"CGP pvalue"])
 xx[,"CCLE pvalue"] <- as.numeric(xx[,"CCLE pvalue"])
 xtable::print.xtable(xtable::xtable(xx, digits=c(0, 0, 0, 0, 2, -1, 2, -1, 0)), include.rownames=FALSE, floating=FALSE, table.placement="!h", file=file.path(saveres, "known_biomarkers.tex"), append=FALSE)
 
+
+## save session info
+write(toLatex(sessionInfo(), locale=FALSE), file=file.path(saveres, "sessionInfoR.tex"), append=FALSE)
+
+### end
