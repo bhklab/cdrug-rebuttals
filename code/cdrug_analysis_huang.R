@@ -4,7 +4,7 @@
 ## load functions
 source(file.path("code", "cdrug_foo.R"))
 
-saveres <- file.path("output")
+saveres <- file.path("output_huang")
 
 ### install all the libraries at once
 # source("https://bioconductor.org/biocLite.R")
