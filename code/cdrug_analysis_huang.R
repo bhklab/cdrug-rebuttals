@@ -512,7 +512,7 @@ exprs(CGP@molecularProfiles$fusion)["BCR_ABL", colnames(exprs(CGP@molecularProfi
 ### update CCLE PSet
 colnames(fData(CCLE@molecularProfiles$rna))[colnames(fData(CCLE@molecularProfiles$rna)) == "symbol"] <- "Symbol"
 fusion.ccle <- CCLE@molecularProfiles$mutation
-exprs(fusion.ccle) <- matrix(NA, nrow=1, ncol=ncol(exprs(fusion.ccle)), dimnames=list("BCR_ABL", colnames(exprs(fusion.ccle))))
+exprs(fusion.ccle) <- matrix("0", nrow=1, ncol=ncol(exprs(fusion.ccle)), dimnames=list("BCR_ABL", colnames(exprs(fusion.ccle))))
 exprs(fusion.ccle)["BCR_ABL", colnames(exprs(fusion.ccle)) %in% celline.bcrabl] <- "BCR Exon_13 to ABL Exon_2"
 myfdata <- data.frame("Symbol"=rownames(fusion.ccle), "gene_biotype"="protein_coding", stringsAsFactors=FALSE)
 rownames(myfdata) <- rownames(fusion.ccle)
@@ -536,7 +536,6 @@ cgp.known.biomarkers[,"probe"] <- rownames(fData(CGP@molecularProfiles$rna))[mat
 cgp.known.biomarkers[,"mutation"] <- NA
 cgp.known.biomarkers[,"fusion"] <- NA
 cgp.known.biomarkers[,"rna"] <- NA
-cgp.known.biomarkers[,"cnv"] <- NA
 for (i in 1:nrow(cgp.known.biomarkers)) {
   gene <- cgp.known.biomarkers[i , "gene"]
   probe <- cgp.known.biomarkers[i , "probe"]
@@ -560,10 +559,23 @@ for (i in 1:nrow(cgp.known.biomarkers)) {
 cgp.mut.biomarkers <- drugSensitivitySig(pSet=CGP, mDataType="mutation", drugs=unique(cgp.known.biomarkers[ ,"drug"]), features=unique(cgp.known.biomarkers[which(!is.na(cgp.known.biomarkers[,"mutation"])),"gene"]), sensitivity.measure="auc_published", molecular.summary.stat="or")
 cgp.fus.biomarkers <- drugSensitivitySig(pSet=CGP, mDataType="fusion", drugs=unique(cgp.known.biomarkers[ ,"drug"]), features=unique(cgp.known.biomarkers[which(!is.na(cgp.known.biomarkers[,"fusion"])),"gene"]), sensitivity.measure="auc_published", molecular.summary.stat="or")
 cgp.rna.biomarkers <- drugSensitivitySig(pSet=CGP, mDataType="rna", drugs=unique(cgp.known.biomarkers[ ,"drug"]), features=unique(cgp.known.biomarkers[which(!is.na(cgp.known.biomarkers[,"rna"])),"probe"]), sensitivity.measure="auc_published", molecular.summary.stat="mean")
-cgp.cnv.biomarkers <- drugSensitivitySig(pSet=CGP, mDataType="cnv", drugs=unique(cgp.known.biomarkers[ ,"drug"]), features=unique(cgp.known.biomarkers[which(!is.na(cgp.known.biomarkers[,"cnv"])),"gene"]), sensitivity.measure="auc_published", molecular.summary.stat="mean")
 
-for(i in 1:length(cgp.known.biomarkers)) {
-   
+for(i in 1:nrow(cgp.known.biomarkers)) {
+  if(!is.na(cgp.known.biomarkers[i, "mutation"]))
+  {
+    cgp.known.biomarkers[i, "mutation.pvalue"] <- cgp.mut.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "pvalue"]
+    cgp.known.biomarkers[i, "mutation.estimate"] <- cgp.mut.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "estimate"]
+  }
+  if(!is.na(cgp.known.biomarkers[i, "fusion"]))
+  {
+    cgp.known.biomarkers[i, "fusion.pvalue"] <- cgp.fus.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "pvalue"]
+    cgp.known.biomarkers[i, "fusion.estimate"] <- cgp.fus.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "estimate"]
+  }
+  if(!is.na(cgp.known.biomarkers[i, "rna"]))
+  {
+    cgp.known.biomarkers[i, "rna.pvalue"] <- cgp.rna.biomarkers@.Data[cgp.known.biomarkers[i,"probe"], cgp.known.biomarkers[i,"drug"], "pvalue"]
+    cgp.known.biomarkers[i, "rna.estimate"] <- cgp.rna.biomarkers@.Data[cgp.known.biomarkers[i,"probe"], cgp.known.biomarkers[i,"drug"], "estimate"]
+  }
 }
 
 ##ccle
@@ -592,4 +604,72 @@ for (i in 1:nrow(ccle.known.biomarkers)) {
 }
 ccle.mut.biomarkers <- drugSensitivitySig(pSet=CCLE, mDataType="mutation", drugs=unique(ccle.known.biomarkers[ ,"drug"]), features=unique(ccle.known.biomarkers[which(!is.na(ccle.known.biomarkers[,"mutation"])),"gene"]), sensitivity.measure="auc_published", molecular.summary.stat="or")
 ccle.fus.biomarkers <- drugSensitivitySig(pSet=CCLE, mDataType="fusion", drugs=unique(ccle.known.biomarkers[ ,"drug"]), features=unique(ccle.known.biomarkers[which(!is.na(ccle.known.biomarkers[,"fusion"])),"gene"]), sensitivity.measure="auc_published", molecular.summary.stat="or")
+pData(CCLE@molecularProfiles$rna)[,"batchid"] <- NA
 ccle.rna.biomarkers <- drugSensitivitySig(pSet=CCLE, mDataType="rna", drugs=unique(ccle.known.biomarkers[ ,"drug"]), features=unique(ccle.known.biomarkers[which(!is.na(ccle.known.biomarkers[,"rna"])),"probe"]), sensitivity.measure="auc_published", molecular.summary.stat="mean")
+for(i in 1:nrow(ccle.known.biomarkers)) {
+  if(!is.na(ccle.known.biomarkers[i, "mutation"]))
+  {
+    ccle.known.biomarkers[i, "mutation.pvalue"] <- ccle.mut.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "pvalue"]
+    ccle.known.biomarkers[i, "mutation.estimate"] <- ccle.mut.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "estimate"]
+  }
+  if(!is.na(ccle.known.biomarkers[i, "fusion"]))
+  {
+    ccle.known.biomarkers[i, "fusion.pvalue"] <- ccle.fus.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "pvalue"]
+    ccle.known.biomarkers[i, "fusion.estimate"] <- ccle.fus.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "estimate"]
+  }
+  if(!is.na(ccle.known.biomarkers[i, "rna"]))
+  {
+    ccle.known.biomarkers[i, "rna.pvalue"] <- ccle.rna.biomarkers@.Data[ccle.known.biomarkers[i,"probe"], ccle.known.biomarkers[i,"drug"], "pvalue"]
+    ccle.known.biomarkers[i, "rna.estimate"] <- ccle.rna.biomarkers@.Data[ccle.known.biomarkers[i,"probe"], ccle.known.biomarkers[i,"drug"], "estimate"]
+  }
+}
+
+cutoff <- 0.05
+xx <- NULL
+for(i in 1:nrow(ccle.known.biomarkers)) {
+  ccle.min <- names(which.min(ccle.known.biomarkers[i, grep("pvalue", colnames(ccle.known.biomarkers))]))
+  cgp.min <- names(which.min(cgp.known.biomarkers[i, grep("pvalue", colnames(cgp.known.biomarkers))]))
+  if(ccle.min == cgp.min) {
+    rr <- c(known.biomarkers[i, "drug"],
+            known.biomarkers[i, "gene"],
+            gsub(".pvalue", "", ccle.min),
+            cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            cgp.known.biomarkers[i, ccle.min],
+            ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            ccle.known.biomarkers[i, ccle.min], 
+            ifelse(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff, "YES", "NO"))
+    xx <- rbind(xx, rr)
+  } else{
+    rr <- c(known.biomarkers[i, "drug"],
+            known.biomarkers[i, "gene"],
+            gsub(".pvalue", "", cgp.min),
+            cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", cgp.min)],
+            cgp.known.biomarkers[i, cgp.min],
+            ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", cgp.min)],
+            ccle.known.biomarkers[i, cgp.min], 
+            ifelse(ccle.known.biomarkers[i, cgp.min] < cutoff & cgp.known.biomarkers[i, cgp.min] < cutoff, "YES", "NO"))
+    xx <- rbind(xx, rr)
+    rr <- c(known.biomarkers[i, "drug"],
+            known.biomarkers[i, "gene"],
+            gsub(".pvalue", "", ccle.min),
+            cgp.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            cgp.known.biomarkers[i, ccle.min],
+            ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
+            ccle.known.biomarkers[i, ccle.min], 
+            ifelse(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff, "YES", "NO"))
+    xx <- rbind(xx, rr)
+  }
+}
+colnames(xx) <- c("Drug", "Gene", "Type", "CGP effect size", "CGP pvalue", "CCLE effect size", "CCLE pvalue", "Reproducibility")
+rownames(xx) <- 1:nrow(xx)
+nilotinib <- which(xx[,"Drug"] == "Nilotinib")
+rr <- xx[nilotinib, ]
+xx <- xx[-nilotinib, ]
+xx <- rbind(rr, xx)
+xx <- as.data.frame(xx, stringsAsFactors=FALSE)
+#xx[is.na(xx)] <- 0
+xx[,"CGP effect size"] <- as.numeric(xx[,"CGP effect size"])
+xx[,"CCLE effect size"] <- as.numeric(xx[,"CCLE effect size"])
+xx[,"CGP pvalue"] <- as.numeric(xx[,"CGP pvalue"])
+xx[,"CCLE pvalue"] <- as.numeric(xx[,"CCLE pvalue"])
+xtable::print.xtable(xtable::xtable(xx, digits=c(0, 0, 0, 0, 2, -1, 2, -1, 0)), include.rownames=FALSE, floating=FALSE, table.placement="!h", file=file.path(saveres, "known_biomarkers.tex"), append=FALSE)
