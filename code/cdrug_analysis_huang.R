@@ -1,6 +1,3 @@
-# args <- commandArgs(trailingOnly = TRUE)
-# if(length(nbcore) == 0){ nbcore <- as.integer(args[1]) }
-
 ## load functions
 source(file.path("code", "cdrug_foo.R"))
 
@@ -47,6 +44,7 @@ myfn <- file.path(saveres, "data_cgp_ccle.RData")
 if (!file.exists(myfn)) {
   ### download curated pharmacogenomic data from CGP and CCLE
   CGP <- PharmacoGx::downloadPSet("GDSC_2013", saveDir=file.path(saveres, "PSets")) 
+  CGP@annotation$name <- "CGP"
   CCLE <- PharmacoGx::downloadPSet("CCLE_2013", saveDir=file.path(saveres, "PSets")) 
   if(confine.analyses.to.nature.common.cell.lines) {
     common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"), cells=nature2013.common.cellines)  
@@ -492,6 +490,7 @@ dev.off()
 #################################################
 
 celline.bcrabl <- c("K-562", "KYO-1", "EM-3", "AR230", "KCL22", "BV-173", "CML-T1", "EM-2", "KU812", "LAMA-84", "MEG-01")
+
 ### update CGP PSet
 myfn <- file.path(saveres, "gdsc2013_mutation.csv")
 if (!file.exists(myfn)) {
@@ -509,6 +508,7 @@ CGP@molecularProfiles$fusion <- ExpressionSet(assayData=fusion.cgp, phenoData=An
 annotation(CGP@molecularProfiles$fusion) <- "fusion"
 CGP@molecularProfiles$mutation <- CGP@molecularProfiles$mutation[!is.element(rownames(fData(CGP@molecularProfiles$mutation)), c("BCR_ABL", "EWS_FLI1", "MLL_AFF1")), ]
 exprs(CGP@molecularProfiles$fusion)["BCR_ABL", colnames(exprs(CGP@molecularProfiles$fusion)) %in% celline.bcrabl] <- "BCR Exon_13 to ABL Exon_2"
+
 ### update CCLE PSet
 colnames(fData(CCLE@molecularProfiles$rna))[colnames(fData(CCLE@molecularProfiles$rna)) == "symbol"] <- "Symbol"
 fusion.ccle <- CCLE@molecularProfiles$mutation
@@ -518,16 +518,10 @@ myfdata <- data.frame("Symbol"=rownames(fusion.ccle), "gene_biotype"="protein_co
 rownames(myfdata) <- rownames(fusion.ccle)
 mypdata <- data.frame(cbind("batchid"=NA, "cellid"=colnames(fusion.ccle)), stringsAsFactors=FALSE)
 rownames(mypdata) <- colnames(fusion.ccle)
-
 fData(fusion.ccle) <- myfdata
 pData(fusion.ccle) <- mypdata
 CCLE@molecularProfiles$fusion <- fusion.ccle
 annotation(CCLE@molecularProfiles$fusion) <- "fusion"
-
-# gene.cgp <- list("rna"=fData(CGP@molecularProfiles$rna)[ , "Symbol"], "mutation"=fData(CGP@molecularProfiles$mutation)[ , "Symbol"], "fusion"=rownames(fData(CGP@molecularProfiles$fusion)))
-# known.biomarkers[!is.element(known.biomarkers[ , "gene"], sort(unique(unlist(gene.cgp)))), ]
-# gene.ccle <- list("rna"=fData(CCLE@molecularProfiles$rna)[ , "Symbol"], "mutation"=fData(CCLE@molecularProfiles$mutation)[ , "Symbol"], "fusion"=fData(CCLE@molecularProfiles$fusion)[ , "Symbol"])
-# known.biomarkers[!is.element(known.biomarkers[ , "gene"], sort(unique(unlist(gene.ccle)))), ]
 
 ### for each known biomarker, estimate gene-drug association for mutation, fusion and expression
 cgp.known.biomarkers <- known.biomarkers
@@ -539,20 +533,16 @@ cgp.known.biomarkers[,"rna"] <- NA
 for (i in 1:nrow(cgp.known.biomarkers)) {
   gene <- cgp.known.biomarkers[i , "gene"]
   probe <- cgp.known.biomarkers[i , "probe"]
-  if (gene %in% rownames(exprs(CGP@molecularProfiles$mutation)) && !all(is.na(exprs(CGP@molecularProfiles$mutation)[gene, ])))
-  {
+  if (gene %in% rownames(exprs(CGP@molecularProfiles$mutation)) && !all(is.na(exprs(CGP@molecularProfiles$mutation)[gene, ]))) {
     cgp.known.biomarkers[i,"mutation"] <- 1
   }
-  if (gene %in% rownames(exprs(CGP@molecularProfiles$fusion)) && !all(is.na(exprs(CGP@molecularProfiles$fusion)[gene, ])))
-  {
+  if (gene %in% rownames(exprs(CGP@molecularProfiles$fusion)) && !all(is.na(exprs(CGP@molecularProfiles$fusion)[gene, ]))) {
     cgp.known.biomarkers[i,"fusion"] <- 1
   }
-  if (probe %in% rownames(exprs(CGP@molecularProfiles$rna)) && !all(is.na(exprs(CGP@molecularProfiles$rna)[probe, ])))
-  {
+  if (probe %in% rownames(exprs(CGP@molecularProfiles$rna)) && !all(is.na(exprs(CGP@molecularProfiles$rna)[probe, ]))) {
     cgp.known.biomarkers[i,"rna"] <- 1
   }
-  if (gene %in% rownames(exprs(CGP@molecularProfiles$cnv)) && !all(is.na(exprs(CGP@molecularProfiles$cnv)[gene, ])))
-  {
+  if (gene %in% rownames(exprs(CGP@molecularProfiles$cnv)) && !all(is.na(exprs(CGP@molecularProfiles$cnv)[gene, ]))) {
     cgp.known.biomarkers[i,"cnv"] <- 1
   }
 }
@@ -561,18 +551,15 @@ cgp.fus.biomarkers <- drugSensitivitySig(pSet=CGP, mDataType="fusion", drugs=uni
 cgp.rna.biomarkers <- drugSensitivitySig(pSet=CGP, mDataType="rna", drugs=unique(cgp.known.biomarkers[ ,"drug"]), features=unique(cgp.known.biomarkers[which(!is.na(cgp.known.biomarkers[,"rna"])),"probe"]), sensitivity.measure="auc_published", molecular.summary.stat="mean")
 
 for(i in 1:nrow(cgp.known.biomarkers)) {
-  if(!is.na(cgp.known.biomarkers[i, "mutation"]))
-  {
+  if(!is.na(cgp.known.biomarkers[i, "mutation"])) {
     cgp.known.biomarkers[i, "mutation.pvalue"] <- cgp.mut.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "pvalue"]
     cgp.known.biomarkers[i, "mutation.estimate"] <- cgp.mut.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "estimate"]
   }
-  if(!is.na(cgp.known.biomarkers[i, "fusion"]))
-  {
+  if(!is.na(cgp.known.biomarkers[i, "fusion"])) {
     cgp.known.biomarkers[i, "fusion.pvalue"] <- cgp.fus.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "pvalue"]
     cgp.known.biomarkers[i, "fusion.estimate"] <- cgp.fus.biomarkers@.Data[cgp.known.biomarkers[i,"gene"], cgp.known.biomarkers[i,"drug"], "estimate"]
   }
-  if(!is.na(cgp.known.biomarkers[i, "rna"]))
-  {
+  if(!is.na(cgp.known.biomarkers[i, "rna"])) {
     cgp.known.biomarkers[i, "rna.pvalue"] <- cgp.rna.biomarkers@.Data[cgp.known.biomarkers[i,"probe"], cgp.known.biomarkers[i,"drug"], "pvalue"]
     cgp.known.biomarkers[i, "rna.estimate"] <- cgp.rna.biomarkers@.Data[cgp.known.biomarkers[i,"probe"], cgp.known.biomarkers[i,"drug"], "estimate"]
   }
@@ -589,16 +576,13 @@ ccle.known.biomarkers[,"cnv"] <- NA
 for (i in 1:nrow(ccle.known.biomarkers)) {
   gene <- ccle.known.biomarkers[i , "gene"]
   probe <- ccle.known.biomarkers[i , "probe"]
-  if (gene %in% rownames(exprs(CCLE@molecularProfiles$mutation)) && !all(is.na(exprs(CCLE@molecularProfiles$mutation)[gene, ])))
-  {
+  if (gene %in% rownames(exprs(CCLE@molecularProfiles$mutation)) && !all(is.na(exprs(CCLE@molecularProfiles$mutation)[gene, ]))) {
     ccle.known.biomarkers[i,"mutation"] <- 1
   }
-  if (gene %in% rownames(exprs(CCLE@molecularProfiles$fusion)) && !all(is.na(exprs(CCLE@molecularProfiles$fusion)[gene, ])))
-  {
+  if (gene %in% rownames(exprs(CCLE@molecularProfiles$fusion)) && !all(is.na(exprs(CCLE@molecularProfiles$fusion)[gene, ]))) {
     ccle.known.biomarkers[i,"fusion"] <- 1
   }
-  if (probe %in% rownames(exprs(CCLE@molecularProfiles$rna)) && !all(is.na(exprs(CCLE@molecularProfiles$rna)[probe, ])))
-  {
+  if (probe %in% rownames(exprs(CCLE@molecularProfiles$rna)) && !all(is.na(exprs(CCLE@molecularProfiles$rna)[probe, ]))) {
     ccle.known.biomarkers[i,"rna"] <- 1
   }
 }
@@ -607,18 +591,15 @@ ccle.fus.biomarkers <- drugSensitivitySig(pSet=CCLE, mDataType="fusion", drugs=u
 pData(CCLE@molecularProfiles$rna)[,"batchid"] <- NA
 ccle.rna.biomarkers <- drugSensitivitySig(pSet=CCLE, mDataType="rna", drugs=unique(ccle.known.biomarkers[ ,"drug"]), features=unique(ccle.known.biomarkers[which(!is.na(ccle.known.biomarkers[,"rna"])),"probe"]), sensitivity.measure="auc_published", molecular.summary.stat="mean")
 for(i in 1:nrow(ccle.known.biomarkers)) {
-  if(!is.na(ccle.known.biomarkers[i, "mutation"]))
-  {
+  if(!is.na(ccle.known.biomarkers[i, "mutation"])) {
     ccle.known.biomarkers[i, "mutation.pvalue"] <- ccle.mut.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "pvalue"]
     ccle.known.biomarkers[i, "mutation.estimate"] <- ccle.mut.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "estimate"]
   }
-  if(!is.na(ccle.known.biomarkers[i, "fusion"]))
-  {
+  if(!is.na(ccle.known.biomarkers[i, "fusion"])) {
     ccle.known.biomarkers[i, "fusion.pvalue"] <- ccle.fus.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "pvalue"]
     ccle.known.biomarkers[i, "fusion.estimate"] <- ccle.fus.biomarkers@.Data[ccle.known.biomarkers[i,"gene"], ccle.known.biomarkers[i,"drug"], "estimate"]
   }
-  if(!is.na(ccle.known.biomarkers[i, "rna"]))
-  {
+  if(!is.na(ccle.known.biomarkers[i, "rna"])) {
     ccle.known.biomarkers[i, "rna.pvalue"] <- ccle.rna.biomarkers@.Data[ccle.known.biomarkers[i,"probe"], ccle.known.biomarkers[i,"drug"], "pvalue"]
     ccle.known.biomarkers[i, "rna.estimate"] <- ccle.rna.biomarkers@.Data[ccle.known.biomarkers[i,"probe"], ccle.known.biomarkers[i,"drug"], "estimate"]
   }
@@ -673,3 +654,4 @@ xx[,"CCLE effect size"] <- as.numeric(xx[,"CCLE effect size"])
 xx[,"CGP pvalue"] <- as.numeric(xx[,"CGP pvalue"])
 xx[,"CCLE pvalue"] <- as.numeric(xx[,"CCLE pvalue"])
 xtable::print.xtable(xtable::xtable(xx, digits=c(0, 0, 0, 0, 2, -1, 2, -1, 0)), include.rownames=FALSE, floating=FALSE, table.placement="!h", file=file.path(saveres, "known_biomarkers.tex"), append=FALSE)
+
