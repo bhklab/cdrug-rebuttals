@@ -610,7 +610,17 @@ xx <- NULL
 for(i in 1:nrow(ccle.known.biomarkers)) {
   ccle.min <- names(which.min(ccle.known.biomarkers[i, grep("pvalue", colnames(ccle.known.biomarkers))]))
   cgp.min <- names(which.min(cgp.known.biomarkers[i, grep("pvalue", colnames(cgp.known.biomarkers))]))
+  tt <- NA
   if(ccle.min == cgp.min) {
+    if(!is.na(ccle.known.biomarkers[i, ccle.min]) & !is.na(cgp.known.biomarkers[i, ccle.min])){
+      if(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff){
+        tt <- "YES"
+      }else if(ccle.known.biomarkers[i, ccle.min] >= cutoff & cgp.known.biomarkers[i, ccle.min] >= cutoff){
+        tt <- "NS"
+      }else{
+        tt <- "NO"
+      }
+    }
     rr <- c(known.biomarkers[i, "drug"],
             known.biomarkers[i, "gene"],
             gsub(".pvalue", "", ccle.min),
@@ -618,9 +628,19 @@ for(i in 1:nrow(ccle.known.biomarkers)) {
             cgp.known.biomarkers[i, ccle.min],
             ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
             ccle.known.biomarkers[i, ccle.min], 
-            ifelse(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff, "YES", "NO"))
+            tt)
     xx <- rbind(xx, rr)
   } else{
+    tt <- NA
+    if(!is.na(ccle.known.biomarkers[i, cgp.min]) & !is.na(cgp.known.biomarkers[i, cgp.min])){
+      if(ccle.known.biomarkers[i, cgp.min] < cutoff & cgp.known.biomarkers[i, cgp.min] < cutoff){
+        tt <- "YES"
+      }else if(ccle.known.biomarkers[i, cgp.min] >= cutoff & cgp.known.biomarkers[i, cgp.min] >= cutoff){
+        tt <- "NS"
+      }else{
+        tt <- "NO"
+      }
+    }
     rr <- c(known.biomarkers[i, "drug"],
             known.biomarkers[i, "gene"],
             gsub(".pvalue", "", cgp.min),
@@ -628,8 +648,18 @@ for(i in 1:nrow(ccle.known.biomarkers)) {
             cgp.known.biomarkers[i, cgp.min],
             ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", cgp.min)],
             ccle.known.biomarkers[i, cgp.min], 
-            ifelse(ccle.known.biomarkers[i, cgp.min] < cutoff & cgp.known.biomarkers[i, cgp.min] < cutoff, "YES", "NO"))
+            tt)
     xx <- rbind(xx, rr)
+    tt <- NA
+    if(!is.na(ccle.known.biomarkers[i, ccle.min]) & !is.na(cgp.known.biomarkers[i, ccle.min])){
+      if(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff){
+        tt <- "YES"
+      }else if(ccle.known.biomarkers[i, ccle.min] >= cutoff & cgp.known.biomarkers[i, ccle.min] >= cutoff){
+        tt <- "NS"
+      }else{
+        tt <- "NO"
+      }
+    }
     rr <- c(known.biomarkers[i, "drug"],
             known.biomarkers[i, "gene"],
             gsub(".pvalue", "", ccle.min),
@@ -637,7 +667,7 @@ for(i in 1:nrow(ccle.known.biomarkers)) {
             cgp.known.biomarkers[i, ccle.min],
             ccle.known.biomarkers[i, gsub(".pvalue", ".estimate", ccle.min)],
             ccle.known.biomarkers[i, ccle.min], 
-            ifelse(ccle.known.biomarkers[i, ccle.min] < cutoff & cgp.known.biomarkers[i, ccle.min] < cutoff, "YES", "NO"))
+            tt)
     xx <- rbind(xx, rr)
   }
 }
@@ -648,7 +678,7 @@ rr <- xx[nilotinib, ]
 xx <- xx[-nilotinib, ]
 xx <- rbind(rr, xx)
 xx <- as.data.frame(xx, stringsAsFactors=FALSE)
-#xx[is.na(xx)] <- 0
+
 xx[,"CGP effect size"] <- as.numeric(xx[,"CGP effect size"])
 xx[,"CCLE effect size"] <- as.numeric(xx[,"CCLE effect size"])
 xx[,"CGP pvalue"] <- as.numeric(xx[,"CGP pvalue"])
