@@ -7,7 +7,7 @@ saveres <- file.path("output_birtwistle")
 
 ### install all the libraries at once
 # source("https://bioconductor.org/biocLite.R")
-# biocLite(c("VennDiagram", "Hmisc", "xtable", "RColorBrewer", "pROC", "Biobase", "genefu", "PharmacoGx"))
+# biocLite(c("VennDiagram", "Hmisc", "xtable", "RColorBrewer", "pROC", "Biobase", "genefu", "PharmacoGx", "xlsx"))
 library(VennDiagram)
 library(Hmisc)
 library(xtable)
@@ -15,6 +15,7 @@ library(RColorBrewer)
 library(pROC)
 library(Biobase)
 library(genefu)
+library(xlsx)
 # install the latest devel version of the PharmacoGx package
 # library(devtools)
 # devtools::install_github("bhklab/PharmacoGx", ref="master", lib="/mnt/work1/users/bhklab/Rlib/")
@@ -41,11 +42,57 @@ cor.method <- "pearson"
 ## read irtwistle's results
 #################################################
 
+
+
 ### read drug identifiers
+drug.names <- read.xlsx(file=file.path("data", "Birtwistle", "DrugNames.xlsx"), sheetIndex=1, stringsAsFactors=FALSE)
+rownames(drug.names) <- drug.names[ , "PharmacoGx.Name"]
 
 ### read cell line-drug identifiers
+expn <- read.xlsx(file=file.path("data", "Birtwistle", "CelllineNamesInds.xlsx"), sheetIndex=1, stringsAsFactors=FALSE)
+
+celline.names <- cbind("Cell.Line.Name"=sort(unique(expn[ , "Cell.Line.Name"])), "PharmacoGx.Name"=NA)
+pgx.names <- sort(unique(expn[ , "Cell.Line.Name"])) ### UPDATE!!!
+celline.names[ , "PharmacoGx.Name"] <- pgx.names
+rownames(celline.names) <- celline.names[ , "PharmacoGx.Name"]
+
+### update experiment names
+exp.names <- cbind("Experiment.ID"=expn[ , "Cell.Line..Drug.Pair.ID"], t(sapply(expn[ , "Cell.Line..Drug.Pair.ID"], function (x, exps, cells, drugs) {
+        iix <- which(exps[ , "Cell.Line..Drug.Pair.ID"] == x)[1]
+        cc <- exps[iix, "Cell.Line.Name"]
+        cc <- cells[which(cells[ , "Cell.Line.Name"] == cc)[1], "PharmacoGx.Name"]
+        dd <- exps[iix, "Drug.ID.number"]
+        dd <- drugs[which(drugs[ , "Drug.ID"] == dd)[1], "PharmacoGx.Name"]
+        return (c("Cell.Line.Name"=cc, "Drug.Name"=dd))       
+    }, exps=expn, cells=celline.names, drugs=drug.names)))
+    
 
 ### read manual curations and map them to experiments
+study.id <- c("CCLE"=1, "CGP"=2)
+mc <- dir(path=file.path("data", "Birtwistle"), pattern="IP", full.names=TRUE)
+mc.all <- NULL
+for (i in 1:length(mc)) {
+    tt <- read.csv(mc[i], header=FALSE, stringsAsFactors=FALSE)
+    colnames(tt) <- c("Study.ID", "Experiment.ID", "Classification")
+    ### Study names
+    ss <- factor(tt[ , "Study.ID"], levels=c(1, 2))
+    levels(ss) <- names(study.id)
+    ss <- as.character(ss)
+    ### drug names
+    ee <- tt[ , "Experiment.ID"]
+   
+   
+   
+    oo <- factor(tt[ , "Classification"], levels=c(1, 2))
+    levels(oo) <- c("sensitive", "insensitive")
+    oo <- as.character(oo)
+    
+    mc.cgp <- cbind("Experiment.ID"=tt[ss == "CGP", "Experiment.ID"], ee[ss == "CGP", , drop=FALSE], "Classification"=oo[ss == "CGP"])
+    mc.ccle <- cbind("Experiment.ID"=tt[ss == "CCLE", "Experiment.ID"], ee[ss == "CCLE", , drop=FALSE], oo[ss == "CCLE"])
+    
+    mc.all <- c(mc.all, list(cbind(ss, ))
+}
+
 
 #################################################
 ## get pharmacogenomic datasets
