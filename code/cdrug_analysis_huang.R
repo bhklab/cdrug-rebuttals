@@ -1,3 +1,5 @@
+options(stringsAsFactors=FALSE)
+
 ## load functions
 source(file.path("code", "cdrug_foo.R"))
 
@@ -47,9 +49,9 @@ if (!file.exists(myfn)) {
   CGP@annotation$name <- "CGP"
   CCLE <- PharmacoGx::downloadPSet("CCLE_2013", saveDir=file.path(saveres, "PSets")) 
   if(confine.analyses.to.nature.common.cell.lines) {
-    common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"), cells=nature2013.common.cellines)  
+    common <- PharmacoGx::intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"), cells=nature2013.common.cellines)  
   } else { 
-    common <- intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"))
+    common <- PharmacoGx::intersectPSet(pSets = list("CCLE"=CCLE, "CGP"=CGP), intersectOn = c("cell.lines", "drugs"))
   }
   ### 512 cell lines and 15 drugs in comon
 
@@ -60,17 +62,16 @@ if (!file.exists(myfn)) {
   ### common affymetrix probes
   common.features <- intersect(rownames(featureInfo(common$CCLE, "rna"))[featureInfo(common$CCLE, "rna")[,"BEST"]==T], rownames(featureInfo(common$CGP, "rna"))[featureInfo(common$CGP, "rna")[,"BEST"]==T])
   ### CGP
-  cgp.ge <- summarizeMolecularProfiles(pSet=common$CGP, mDataType="rna", summary.stat="median")
+  cgp.ge <- PharmacoGx::summarizeMolecularProfiles(pSet=common$CGP, mDataType="rna", summary.stat="median")
   cgp.ge <- cgp.ge[common.features,]
-  cgp.auc <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="auc_published", summary.stat="median")[drugix, , drop=FALSE]
-  cgp.ic50 <- summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="ic50_published", summary.stat="median")[drugix, , drop=FALSE]
+  cgp.auc <- PharmacoGx::summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="auc_published", summary.stat="median")[drugix, , drop=FALSE]
+  cgp.ic50 <- PharmacoGx::summarizeSensitivityProfiles(pSet=common$CGP, sensitivity.measure="ic50_published", summary.stat="median")[drugix, , drop=FALSE]
   ### CCLE
-  ccle.ge <- summarizeMolecularProfiles(pSet=common$CCLE, mDataType="rna", summary.stat="median")
+  ccle.ge <- PharmacoGx::summarizeMolecularProfiles(pSet=common$CCLE, mDataType="rna", summary.stat="median")
   ccle.ge <- ccle.ge[common.features,]
-  ccle.auc <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="auc_published", summary.stat="median")[drugix, , drop=FALSE]
-  ccle.ic50 <- summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="ic50_published", summary.stat="median")[drugix, , drop=FALSE]
+  ccle.auc <- PharmacoGx::summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="auc_published", summary.stat="median")[drugix, , drop=FALSE]
+  ccle.ic50 <- PharmacoGx::summarizeSensitivityProfiles(pSet=common$CCLE, sensitivity.measure="ic50_published", summary.stat="median")[drugix, , drop=FALSE]
   ### note that ic50 and auc recomputed using a unified pipeline could be selected by using ic50_recomputed or auc_recomputed
-
   save(list=c("CGP", "CCLE", "common", "common.features", "cgp.ge", "cgp.auc", "cgp.ic50", "ccle.ge", "ccle.auc", "ccle.ic50"), compress=TRUE, file=myfn)
 } else {
   load(myfn)
