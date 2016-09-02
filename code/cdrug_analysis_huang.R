@@ -17,7 +17,7 @@ library(Biobase)
 library(genefu)
 # install the latest devel version of the PharmacoGx package
 # library(devtools)
-# devtools::install_github("bhklab/PharmacoGx", ref="master", lib="/mnt/work1/users/bhklab/Rlib/")
+# devtools::install_github("bhklab/PharmacoGx", ref="master")
 library(PharmacoGx)
 
 ### cell lines used in Haibe-Kains et al, Nature 2013
