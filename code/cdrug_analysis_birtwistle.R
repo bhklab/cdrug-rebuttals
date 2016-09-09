@@ -470,4 +470,7 @@ wilcox.test(x=mcc.drugs[ , "Manual curation"], y=mcc.drugs[ , "m_s"], alternativ
 drugDoseResponseCurve(drug="paclitaxel", cellline="JVM-3", pSets=list(CGP, CCLE))
 drugDoseResponseCurve(drug="Nilotinib", cellline="EM-2", pSets=list(CGP, CCLE))
 
+## save session info
+write(toLatex(sessionInfo(), locale=FALSE), file=file.path(saveres, "sessionInfoR.tex"), append=FALSE)
 
+### end
