@@ -5,11 +5,6 @@ source(file.path("code", "cdrug_foo.R"))
 
 saveres <- file.path("output_birtwistle")
 
-### for PharmacoGx-private
-# source("https://bioconductor.org/biocLite.R")
-# biocLite(c("WriteXLS", "R.utils", "affy", "affxparser", "affyio", "frma", "hthgu133afrmavecs", "hthgu133acdf", "hthgu133a.db", "hgu133a.db", "hgu133afrmavecs", "hgu133plus2frmavecs", "hgu133plus2.db"))
-
-
 ### install all the libraries at once
 # source("https://bioconductor.org/biocLite.R")
 # biocLite(c("VennDiagram", "Hmisc", "xtable", "RColorBrewer", "pROC", "Biobase", "genefu", "PharmacoGx", "xlsx"))
@@ -45,7 +40,7 @@ cor.method <- "pearson"
 ## get pharmacogenomic datasets
 #################################################
 
-### download curated pharmacogenomic data from CGP and CCLE
+### download curated pharmacogenomic data for CGP and CCLE
 CGP <- PharmacoGx::downloadPSet("GDSC", saveDir=file.path(saveres, "PSets"))
 CGP@annotation$name <- "CGP"
 CCLE <- PharmacoGx::downloadPSet("CCLE", saveDir=file.path(saveres, "PSets")) 
