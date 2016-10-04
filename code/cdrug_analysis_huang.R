@@ -29,6 +29,9 @@ known.biomarkers <- read.csv(file.path("data", "known_biomarkers.csv"), stringsA
 ### global parameters
 
 nbcore <- 4
+availcore <- parallel::detectCores()
+if (is.null(nbcore) || nbcore > availcore) { nbcore <- availcore }
+options("mc.cores"=nbcore)
 
 badchars <- "[\xb5]|[]|[ ,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
 

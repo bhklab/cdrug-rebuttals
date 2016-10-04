@@ -22,16 +22,14 @@ library(psych)
 # devtools::install_github("bhklab/PharmacoGx", ref="master")
 library(PharmacoGx)
 
-### llist of known targets and biomarkers
-known.biomarkers <- read.csv(file.path("data", "known_biomarkers.csv"), stringsAsFactors=FALSE)
-
 ### global parameters
 
 nbcore <- 4
+availcore <- parallel::detectCores()
+if (is.null(nbcore) || nbcore > availcore) { nbcore <- availcore }
+options("mc.cores"=nbcore)
 
 badchars <- "[\xb5]|[]|[ ,]|[;]|[:]|[-]|[+]|[*]|[%]|[$]|[#]|[{]|[}]|[[]|[]]|[|]|[\\^]|[/]|[\\]|[.]|[_]|[ ]"
-
-confine.analyses.to.nature.common.cell.lines <- FALSE
 
 cor.method <- "pearson"
 
@@ -202,7 +200,7 @@ mycol <- rep(blues9[7], length(xx))
 names(mycol) <- names(xx)
 myScatterPlot(x=xx, y=yy, xlab="AUC (CGP)", ylab="AUC (CCLE)", main="", xlim=xxlim, ylim=yylim, pch=16, method="transparent", transparency=0.25, col=mycol)
 abline(a=0, b=1, col="black")
-cc.auc <- cor.test(xx, yy, method="pearson", use="complete.obs")
+cc.auc <- cor.test(xx, yy, method=cor.method, use="complete.obs")
 nn.auc <- sum(complete.cases(xx, yy))
 legend("bottomright", legend=sprintf("rho = %.2g", cc.auc$estimate), bty="n", cex=1.25)
 
@@ -217,7 +215,7 @@ mycol <- rep(blues9[7], length(xx))
 names(mycol) <- names(xx)
 myScatterPlot(x=xx, y=yy, xlab="AUC_s (CGP)", ylab="AUC_s (CCLE)", main="", xlim=xxlim, ylim=yylim, pch=16, method="transparent", transparency=0.25, col=mycol)
 abline(a=0, b=1, col="black")
-cc.aucs <- cor.test(xx, yy, method="pearson", use="complete.obs")
+cc.aucs <- cor.test(xx, yy, method=cor.method, use="complete.obs")
 nn.aucs <- sum(complete.cases(xx, yy))
 legend("bottomright", legend=sprintf("rho = %.2g", cc.aucs$estimate), bty="n", cex=1.25)
 ### test for difference in correlation
@@ -235,7 +233,7 @@ mycol <- rep(blues9[7], length(xx))
 names(mycol) <- names(xx)
 myScatterPlot(x=xx, y=yy, xlab="m (CGP)", ylab="m (CCLE)", main="", xlim=xxlim, ylim=yylim, pch=16, method="transparent", transparency=0.25, col=mycol)
 abline(a=0, b=1, col="black")
-cc.m <- cor.test(xx, yy, method="pearson", use="complete.obs")
+cc.m <- cor.test(xx, yy, method=cor.method, use="complete.obs")
 nn.m <- sum(complete.cases(xx, yy))
 legend("bottomright", legend=sprintf("rho = %.2g", cc.m$estimate), bty="n", cex=1.25)
 ### m_s
@@ -249,7 +247,7 @@ mycol <- rep(blues9[7], length(xx))
 names(mycol) <- names(xx)
 myScatterPlot(x=xx, y=yy, xlab="m_s (CGP)", ylab="m_s (CCLE)", main="", xlim=xxlim, ylim=yylim, pch=16, method="transparent", transparency=0.25, col=mycol)
 abline(a=0, b=1, col="black")
-cc.ms <- cor.test(xx, yy, method="pearson", use="complete.obs")
+cc.ms <- cor.test(xx, yy, method=cor.method, use="complete.obs")
 nn.ms <- sum(complete.cases(xx, yy))
 legend("bottomright", legend=sprintf("rho = %.2g", cc.ms$estimate), bty="n", cex=1.25)
 ### test for difference in correlation
@@ -265,12 +263,12 @@ for (i in 1:length(drugn)) {
   ### AUC
   xx <- cgp.auc[drugn[i], ]
   yy <- ccle.auc[drugn[i], ]
-  cc <- cor(xx, yy, method="pearson", use="complete.obs")
+  cc <- cor(xx, yy, method=cor.method, use="complete.obs")
   cc.auc.all["AUC", drugn[i]] <- cc
   ### AUC_s
   xx <- cgp.aucs[drugn[i], ]
   yy <- ccle.aucs[drugn[i], ]
-  cc <- cor(xx, yy, method="pearson", use="complete.obs")
+  cc <- cor(xx, yy, method=cor.method, use="complete.obs")
   cc.auc.all["AUC_s", drugn[i]] <- cc
 }
 bp <- barplot(cc.auc.all, las=2, beside=TRUE, space=c(0.1, 1), ylim=c(0, 1), ylab=expression(rho), cex.lab=1.5, col=c("grey20", "grey70"))
@@ -285,12 +283,12 @@ for (i in 1:length(drugn)) {
   ### AUC
   xx <- cgp.slope[drugn[i], ]
   yy <- ccle.slope[drugn[i], ]
-  cc <- cor(xx, yy, method="pearson", use="complete.obs")
+  cc <- cor(xx, yy, method=cor.method, use="complete.obs")
   cc.slope.all["m", drugn[i]] <- cc
   ### AUC_s
   xx <- cgp.slopes[drugn[i], ]
   yy <- ccle.slopes[drugn[i], ]
-  cc <- cor(xx, yy, method="pearson", use="complete.obs")
+  cc <- cor(xx, yy, method=cor.method, use="complete.obs")
   cc.slope.all["m_s", drugn[i]] <- cc
 }
 bp <- barplot(cc.slope.all, las=2, beside=TRUE, space=c(0.1, 1), ylim=c(0, 1), ylab=expression(rho), cex.lab=1.5, col=c("grey20", "grey70"))
