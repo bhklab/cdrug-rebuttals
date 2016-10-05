@@ -77,9 +77,16 @@ if (!file.exists(myfn)) {
   for (i in 1:length(ppl)) {
     ppl[[i]]@sensitivity$profiles[ , grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))] <- NA
     ### recompute auc on common concentration range
-    aa <- apply(X=ppl[[i]]@sensitivity$raw, MARGIN=1, FUN=function (x) {
+    splitix <- parallel::splitIndices(nx=dim(ppl[[i]]@sensitivity$raw)[1], ncl=nbcore)
+    splitix <- splitix[sapply(splitix, length) > 0]
+    mcres <- parallel::mclapply(splitix, function(x, xx) {
+        rr <- apply(X=xx[x, , , drop=FALSE], MARGIN=1, FUN=function (x) {
         return (PharmacoGx::computeAUC(concentration=x[ , "Dose"], viability=x[ , "Viability"], verbose=FALSE))
       })
+      return (rr)
+    }, xx=ppl[[i]]@sensitivity$raw)
+    aa <- do.call(c, mcres)
+    aa <- aa[rownames(ppl[[i]]@sensitivity$profiles)]
     ppl[[i]]@sensitivity$profiles <- cbind(ppl[[i]]@sensitivity$profiles, "auc_recomputed"=aa / 100)
   }
   commons.ccle.fimm <- ppl
@@ -90,9 +97,16 @@ if (!file.exists(myfn)) {
   for (i in 1:length(ppl)) {
     ppl[[i]]@sensitivity$profiles[ , grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))] <- NA
     ### recompute auc on common concentration range
-    aa <- apply(X=ppl[[i]]@sensitivity$raw, MARGIN=1, FUN=function (x) {
+    splitix <- parallel::splitIndices(nx=dim(ppl[[i]]@sensitivity$raw)[1], ncl=nbcore)
+    splitix <- splitix[sapply(splitix, length) > 0]
+    mcres <- parallel::mclapply(splitix, function(x, xx) {
+        rr <- apply(X=xx[x, , , drop=FALSE], MARGIN=1, FUN=function (x) {
         return (PharmacoGx::computeAUC(concentration=x[ , "Dose"], viability=x[ , "Viability"], verbose=FALSE))
       })
+      return (rr)
+    }, xx=ppl[[i]]@sensitivity$raw)
+    aa <- do.call(c, mcres)
+    aa <- aa[rownames(ppl[[i]]@sensitivity$profiles)]
     ppl[[i]]@sensitivity$profiles <- cbind(ppl[[i]]@sensitivity$profiles, "auc_recomputed"=aa / 100)
   }
   commons.cgp.fimm <- ppl
@@ -102,10 +116,17 @@ if (!file.exists(myfn)) {
   ppl <- PharmacoGx::intersectPSet(pSets = list("CGP"=CGP, "CCLE"=CCLE), intersectOn = c("cell.lines", "drugs", "concentrations"), strictIntersect=TRUE, nthread=nbcore)
   for (i in 1:length(ppl)) {
     ppl[[i]]@sensitivity$profiles[ , grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))] <- NA
-    ### recompute auc on common concentration range
-    aa <- apply(X=ppl[[i]]@sensitivity$raw, MARGIN=1, FUN=function (x) {
+    ### recompute auc on common concentration range  
+    splitix <- parallel::splitIndices(nx=dim(ppl[[i]]@sensitivity$raw)[1], ncl=nbcore)
+    splitix <- splitix[sapply(splitix, length) > 0]
+    mcres <- parallel::mclapply(splitix, function(x, xx) {
+        rr <- apply(X=xx[x, , , drop=FALSE], MARGIN=1, FUN=function (x) {
         return (PharmacoGx::computeAUC(concentration=x[ , "Dose"], viability=x[ , "Viability"], verbose=FALSE))
       })
+      return (rr)
+    }, xx=ppl[[i]]@sensitivity$raw)
+    aa <- do.call(c, mcres)
+    aa <- aa[rownames(ppl[[i]]@sensitivity$profiles)]
     ppl[[i]]@sensitivity$profiles <- cbind(ppl[[i]]@sensitivity$profiles, "auc_recomputed"=aa / 100)
   }
   commons.cgp.ccle <- ppl
