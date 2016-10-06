@@ -49,7 +49,40 @@ CGP@annotation$name <- "CGP"
 CCLE <- PharmacoGx::downloadPSet("CCLE", saveDir=file.path(saveres, "PSets")) 
 
 ### FIMM
-load("/mnt/work1/users/bhklab/Projects/PharmacoGxTest/PSets/FIMM.RData")
+FIMM <- PharmacoGx::downloadPSet("FIMM", saveDir=file.path(saveres, "PSets"))
+
+### plot the drug dose-response curves for the FIMM dataset
+dd <- rownames(drugInfo(FIMM))
+cc <- rownames(cellInfo(FIMM))
+
+pp.all <- NULL
+for (i in 1:length(dd)) {
+  for (j in 1:length(cc)) {
+    if (sum(sensitivityInfo(FIMM)[ , "drugid"] == dd[i] & sensitivityInfo(FIMM)[ , "cellid"] == cc[j]) > 0) {
+      pp <- c("drugid"=dd[i], "cellid"=cc[j], "CGP"=FALSE, "CCLE"=FALSE)
+      if (sum(sensitivityInfo(CGP)[ , "drugid"] == dd[i] & sensitivityInfo(CGP)[ , "cellid"] == cc[j]) > 0) {
+        pp["CGP"] <- TRUE
+      }
+      if (sum(sensitivityInfo(CCLE)[ , "drugid"] == dd[i] & sensitivityInfo(CCLE)[ , "cellid"] == cc[j]) > 0) {
+        pp["CCLE"] <- TRUE
+      }
+      pp.all <- rbind(pp.all, pp)
+    }
+  }
+}
+
+pdf(file.path(saveres, "fimm_dose_response_curves.pdf"), height=15, width=8)
+par(mfrow=c(5, 3))
+mycol <- RColorBrewer::brewer.pal(n=7, name="Set1")[1:3]
+apply(pp.all, 1, function (x, y, z) {
+  y <- y[as.logical(c(TRUE, x[c("CGP", "CCLE")]))]
+  z <- z[as.logical(c(TRUE, x[c("CGP", "CCLE")]))]
+  PharmacoGx::drugDoseResponseCurve(drug=x["drugid"], cellline=x["cellid"], pSets=y, trunc=FALSE, plot.type="Actual", mycol=z)
+}, y=list(FIMM, CGP, CCLE), z=mycol)
+
+dev.off()
+
+
 
 message("Intersection of PSets")
 myfn <- file.path(saveres, "data_common_cgp_ccle_fimm.RData")
@@ -75,7 +108,7 @@ if (!file.exists(myfn)) {
   message("\t\tCCLE vs FIMM")
   ppl <- PharmacoGx::intersectPSet(pSets = list("CCLE"=CCLE, "FIMM"=FIMM), intersectOn = c("cell.lines", "drugs", "concentrations"), strictIntersect=TRUE, nthread=nbcore)
   for (i in 1:length(ppl)) {
-    ppl[[i]]@sensitivity$profiles[ , grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))] <- NA
+    ppl[[i]]@sensitivity$profiles <- ppl[[i]]@sensitivity$profiles[ , -grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))]
     ### recompute auc on common concentration range
     splitix <- parallel::splitIndices(nx=dim(ppl[[i]]@sensitivity$raw)[1], ncl=nbcore)
     splitix <- splitix[sapply(splitix, length) > 0]
@@ -95,7 +128,7 @@ if (!file.exists(myfn)) {
   message("\t\tCGP vs FIMM")
   ppl <- PharmacoGx::intersectPSet(pSets = list("CGP"=CGP, "FIMM"=FIMM), intersectOn = c("cell.lines", "drugs", "concentrations"), strictIntersect=TRUE, nthread=nbcore)
   for (i in 1:length(ppl)) {
-    ppl[[i]]@sensitivity$profiles[ , grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))] <- NA
+    ppl[[i]]@sensitivity$profiles <- ppl[[i]]@sensitivity$profiles[ , -grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))]
     ### recompute auc on common concentration range
     splitix <- parallel::splitIndices(nx=dim(ppl[[i]]@sensitivity$raw)[1], ncl=nbcore)
     splitix <- splitix[sapply(splitix, length) > 0]
@@ -115,7 +148,7 @@ if (!file.exists(myfn)) {
   message("\t\tCGP vs CCLE")
   ppl <- PharmacoGx::intersectPSet(pSets = list("CGP"=CGP, "CCLE"=CCLE), intersectOn = c("cell.lines", "drugs", "concentrations"), strictIntersect=TRUE, nthread=nbcore)
   for (i in 1:length(ppl)) {
-    ppl[[i]]@sensitivity$profiles[ , grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))] <- NA
+    ppl[[i]]@sensitivity$profiles <- ppl[[i]]@sensitivity$profiles[ , -grep("*_recomputed", colnames(ppl[[i]]@sensitivity$profiles))]
     ### recompute auc on common concentration range  
     splitix <- parallel::splitIndices(nx=dim(ppl[[i]]@sensitivity$raw)[1], ncl=nbcore)
     splitix <- splitix[sapply(splitix, length) > 0]
@@ -133,7 +166,7 @@ if (!file.exists(myfn)) {
   rm(ppl)
   
   comp <- c("CCLE.vs.FIMM"="common.ccle.fimm", "CGP.vs.FIMM"="common.cgp.fimm", "CGP.vs.CCLE"="common.cgp.ccle")
-  comps <- c("CCLE.vs.FIMM"="commons.ccle.fimm", "CGP.vs.FIMM"="commons.cgp.fimm", "CGP.vs.CCLE"="commons.cgp.ccle"
+  comps <- c("CCLE.vs.FIMM"="commons.ccle.fimm", "CGP.vs.FIMM"="commons.cgp.fimm", "CGP.vs.CCLE"="commons.cgp.ccle")
   save(list=c(comp, comps, c("comp", "comps")), compress=TRUE, file=myfn)
 } else {
   load(myfn)
@@ -144,7 +177,7 @@ if (!file.exists(myfn)) {
 ### boxplot for AUC unharmonised vs harmonised
 #################################################
 
-across.ccl <- between.ccl <- across.ccl.rank <- between.ccl.rank <-NULL
+across.ccl <- between.ccl <- across.ccl.rank <- between.ccl.rank <- across.ccl.p <- across.ccl.p.rank <- between.ccl.p <- between.ccl.p.rank <- NULL
 
 for (i in 1:length(comp)) {
   
@@ -232,20 +265,28 @@ for (i in 1:length(comp)) {
     return(rr)
   }, y="spearman")
   
-  across.ccl <- c(across.ccl, list(tt), list(tts))
-  across.ccl.rank <- c(across.ccl.rank, list(tt.rank), list(tts.rank))
+  across.ccl.p <- c(across.ccl.p, wilcox.test(tts, tt, alternative="greater", paired=TRUE, exact=FALSE)$p.value)
+  across.ccl.p.rank <- c(across.ccl.p.rank, wilcox.test(tts.rank, tt.rank, alternative="greater", paired=TRUE, exact=FALSE)$p.value)
+  
+  across.ccl <- c(across.ccl, list(tts), list(tt))
+  across.ccl.rank <- c(across.ccl.rank, list(tts.rank), list(tt.rank))
   if (i < length(comp)) {
     across.ccl <- c(across.ccl, list(NA))
     across.ccl.rank <- c(across.ccl.rank, list(NA))
   }
+  
+  
+  between.ccl.p <- c(between.ccl.p, wilcox.test(tts2, tt2, alternative="greater", paired=TRUE, exact=FALSE)$p.value)
+  between.ccl.p.rank <- c(between.ccl.p.rank, wilcox.test(tts2.rank, tt2.rank, alternative="greater", paired=TRUE, exact=FALSE)$p.value)
     
-  between.ccl <- c(between.ccl, list(tt2), list(tts2))
-  between.ccl.rank <- c(between.ccl.rank, list(tt2.rank), list(tts2.rank))
+  between.ccl <- c(between.ccl, list(tts2), list(tt2))
+  between.ccl.rank <- c(between.ccl.rank, list(tts2.rank), list(tt2.rank))
   if (i < length(comps)) {
     between.ccl <- c(between.ccl, list(NA))
     between.ccl.rank <- c(between.ccl.rank, list(NA))
   }
 }
+names(across.ccl.p) <- names(across.ccl.p.rank) <- names(between.ccl.p) <- names(between.ccl.p.rank) <- names(comp)
 
 transparency <- 0.4
 mycol <- c(rgb(red=1, green=0, blue=0, alpha=transparency, maxColorValue=1), rgb(red=0, green=0, blue=1, alpha=transparency, maxColorValue=1), rgb(red=1, green=1, blue=1, alpha=transparency, maxColorValue=1))
@@ -255,32 +296,32 @@ pdf(file.path(saveres, "boxplot_auc.pdf"), width=10, height=10)
 par(mfrow=c(2,2))
 
 par(las=2, mar=c(4, 4, 4, 2) + 0.1, xaxt="n")
-bp <- boxplot(across.ccl, outline=FALSE, ylim=yylim, ylab="Pearson correlation", main="Consistency across cell lines")
+bp <- boxplot(across.ccl, outline=FALSE, ylim=yylim, ylab="Pearson correlation", main="AUC consistency across cell lines")
 axis(1, at=0.5 + seq(1, length(bp$names), by=3), tick=TRUE, labels=TRUE)
 text(x=1.5 + seq(1, length(bp$names), by=3), y=par("usr")[3] - (par("usr")[4] * 0.05), pos=2, labels=names(comp), srt=0, xpd=NA)
 stripchart(across.ccl, vertical=TRUE, method = "jitter", jitter=0.2, add=TRUE, pch=20, col=mycol, cex=2)
-legend("bottomleft", legend=c("Harmonised", "Un-harmonised"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
+legend("bottomleft", title="Concentration range", legend=c("Common", "Full"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
 
 par(las=2, mar=c(4, 4, 4, 2) + 0.1, xaxt="n")
-bp <- boxplot(between.ccl, outline=FALSE, ylim=yylim, ylab="Pearson correlation", main="Consistency between cell lines")
+bp <- boxplot(between.ccl, outline=FALSE, ylim=yylim, ylab="Pearson correlation", main="AUC consistency between cell lines")
 axis(1, at=0.5 + seq(1, length(bp$names), by=3), tick=TRUE, labels=TRUE)
 text(x=1.5 + seq(1, length(bp$names), by=3), y=par("usr")[3] - (par("usr")[4] * 0.05), pos=2, labels=names(comp), srt=0, xpd=NA)
 stripchart(between.ccl, vertical=TRUE, method = "jitter", jitter=0.2, add=TRUE, pch=20, col=mycol, cex=2)
-legend("bottomleft", legend=c("Harmonised", "Un-harmonised"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
+legend("bottomleft", title="Concentration range", legend=c("Common", "Full"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
 
 par(las=2, mar=c(4, 4, 4, 2) + 0.1, xaxt="n")
-bp <- boxplot(across.ccl.rank, outline=FALSE, ylim=yylim, ylab="Spearman correlation", main="Consistency across cell lines")
+bp <- boxplot(across.ccl.rank, outline=FALSE, ylim=yylim, ylab="Spearman correlation", main="AUC consistency across cell lines")
 axis(1, at=1.5 + seq(1, length(bp$names), by=3), tick=TRUE, labels=TRUE)
 text(x=1.5 + seq(1, length(bp$names), by=3), y=par("usr")[3] - (par("usr")[4] * 0.05), pos=2, labels=names(comp), srt=0, xpd=NA)
 stripchart(across.ccl.rank, vertical=TRUE, method = "jitter", jitter=0.2, add=TRUE, pch=20, col=mycol, cex=2)
-legend("bottomleft", legend=c("Harmonised", "Un-harmonised"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
+legend("bottomleft", title="Concentration range", legend=c("Common", "Full"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
 
 par(las=2, mar=c(4, 4, 4, 2) + 0.1, xaxt="n")
-bp <- boxplot(between.ccl.rank, outline=FALSE, ylim=yylim, ylab="Spearman correlation", main="Consistency between cell lines")
+bp <- boxplot(between.ccl.rank, outline=FALSE, ylim=yylim, ylab="Spearman correlation", main="AUC consistency between cell lines")
 axis(1, at=1.5 + seq(1, length(bp$names), by=3), tick=TRUE, labels=TRUE)
 text(x=1.5 + seq(1, length(bp$names), by=3), y=par("usr")[3] - (par("usr")[4] * 0.05), pos=2, labels=names(comp), srt=0, xpd=NA)
 stripchart(between.ccl.rank, vertical=TRUE, method = "jitter", jitter=0.2, add=TRUE, pch=20, col=mycol, cex=2)
-legend("bottomleft", legend=c("Harmonised", "Un-harmonised"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
+legend("bottomleft", title="Concentration range", legend=c("Common", "Full"), col=mycol[1:2], pch=20, pt.cex=2, bty="n")
 
 dev.off()
 
